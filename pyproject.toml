@@ -59,9 +59,9 @@ dev = [
 herald = "herald_cli.cli:cli"
 
 [project.urls]
-Homepage = "https://github.com/yourusername/herald"
-Repository = "https://github.com/yourusername/herald"
-Issues = "https://github.com/yourusername/herald/issues"
+Homepage = "https://github.com/myceldigital/herald"
+Repository = "https://github.com/myceldigital/herald"
+Issues = "https://github.com/myceldigital/herald/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/herald_cli"]
