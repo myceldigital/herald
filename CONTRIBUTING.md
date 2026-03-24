@@ -5,7 +5,7 @@ Thanks for your interest. This project makes clinical practice guidelines comput
 ## Getting started
 
 ```bash
-git clone https://github.com/yourusername/herald.git
+git clone https://github.com/myceldigital/herald.git
 cd herald
 pip install -e ".[dev]"
 pytest tests/ -v

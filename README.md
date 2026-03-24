@@ -38,11 +38,11 @@ The answer traces back to a specific section and page of the source guideline. E
 
 Herald is a three-stage pipeline:
 
-| Stage       | Command          | Input              | Output                   | Needs LLM? |
-| ----------- | ---------------- | ------------------ | ------------------------ | ---------- |
-| **Convert** | `herald convert` | Guideline PDF      | Structured markdown      | No         |
-| **Parse**   | `herald parse`   | Markdown           | Decision tree JSON       | Yes        |
-| **Query**   | `herald query`   | Decision tree JSON | Clinical recommendations | No         |
+| Stage | Command | Input | Output | Needs LLM? |
+|-------|---------|-------|--------|-------------|
+| **Convert** | `herald convert` | Guideline PDF | Structured markdown | No |
+| **Parse** | `herald parse` | Markdown | Decision tree JSON | Yes |
+| **Query** | `herald query` | Decision tree JSON | Clinical recommendations | No |
 
 **Convert** uses [markitdown](https://github.com/microsoft/markitdown) to extract text from PDFs while preserving headings, tables, and document structure.
 
@@ -143,11 +143,7 @@ A minimal example:
       },
       "branches": [
         {
-          "condition": {
-            "field": "comorbidity",
-            "operator": "contains",
-            "value": "anxiety"
-          },
+          "condition": { "field": "comorbidity", "operator": "contains", "value": "anxiety" },
           "next_decision": "adhd_with_anxiety"
         }
       ]
@@ -163,7 +159,6 @@ Every recommendation traces back to `source_section`, `source_page`, and `source
 **This repo ships the engine, not the content.** Clinical practice guidelines are copyrighted by their publishers (NICE, APA, WHO, etc.). The example guidelines in `examples/` are synthetic — written from scratch for demonstration purposes.
 
 To use Herald with real guidelines:
-
 1. Obtain the guideline PDF through legitimate channels
 2. Check the publisher's reuse policy
 3. Convert, parse, and query locally — your documents stay on your machine
