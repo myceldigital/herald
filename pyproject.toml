@@ -7,7 +7,7 @@ name = "herald-cpg"
 version = "0.1.0"
 description = "Turn clinical practice guideline PDFs into queryable decision engines."
 readme = "README.md"
-license = "MIT"
+license = {text = "MIT"}
 requires-python = ">=3.10"
 authors = [
     { name = "Matthew Gavin" },
