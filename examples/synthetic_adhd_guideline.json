@@ -1,0 +1,363 @@
+{
+  "schema_version": "0.1",
+  "guideline": {
+    "title": "Management of Attention Deficit Hyperactivity Disorder in Adults",
+    "short_title": "Adult ADHD Management",
+    "source": "Synthetic Example Guideline Consortium (SEGC)",
+    "version": "1.0",
+    "last_updated": "2026-03-24",
+    "url": null,
+    "condition": "ADHD",
+    "population": "Adults (18+)"
+  },
+  "patient_fields": [
+    {
+      "field": "diagnosis",
+      "type": "string",
+      "required": true,
+      "description": "Confirmed diagnosis"
+    },
+    {
+      "field": "age_group",
+      "type": "enum",
+      "values": ["child", "adolescent", "adult", "elderly"],
+      "required": true,
+      "description": "Patient age category"
+    },
+    {
+      "field": "sex",
+      "type": "enum",
+      "values": ["male", "female"],
+      "required": false,
+      "description": "Patient sex"
+    },
+    {
+      "field": "comorbidities",
+      "type": "list[string]",
+      "required": false,
+      "description": "Active comorbid conditions",
+      "known_values": ["anxiety", "depression", "substance_use", "cardiac_history", "tics", "asd", "insomnia", "eating_disorder"]
+    },
+    {
+      "field": "prior_treatments",
+      "type": "list[object]",
+      "required": false,
+      "description": "Previous medication trials"
+    },
+    {
+      "field": "contraindications",
+      "type": "list[string]",
+      "required": false,
+      "description": "Active contraindications",
+      "known_values": ["cardiac_history", "seizure_history", "pregnancy", "breastfeeding", "substance_use", "uncontrolled_hypertension"]
+    }
+  ],
+  "decisions": [
+    {
+      "id": "first_line_treatment",
+      "description": "First-line pharmacological treatment for adult ADHD without significant comorbidity",
+      "entry_point": true,
+      "conditions": [
+        { "field": "diagnosis", "operator": "eq", "value": "ADHD" },
+        { "field": "age_group", "operator": "eq", "value": "adult" }
+      ],
+      "recommendation": {
+        "action": "Start methylphenidate extended-release, initial dose 18mg once daily in the morning. Titrate by 18mg increments at weekly intervals to a maximum of 72mg/day based on clinical response and tolerability.",
+        "evidence_grade": "A",
+        "strength": "strong",
+        "monitoring": "Blood pressure and heart rate at baseline, at each titration step, and every 6 months thereafter. Weight monitoring every 3 months.",
+        "source_section": "4.1",
+        "source_page": 18,
+        "source_text": "Methylphenidate is recommended as first-line pharmacological treatment for adults with ADHD. Extended-release formulations are preferred to reduce dosing complexity and diversion risk."
+      },
+      "branches": [
+        {
+          "condition": { "field": "comorbidities", "operator": "contains", "value": "anxiety" },
+          "next_decision": "adhd_with_anxiety",
+          "label": "Patient has comorbid anxiety"
+        },
+        {
+          "condition": { "field": "comorbidities", "operator": "contains", "value": "depression" },
+          "next_decision": "adhd_with_depression",
+          "label": "Patient has comorbid depression"
+        },
+        {
+          "condition": { "field": "comorbidities", "operator": "contains", "value": "substance_use" },
+          "next_decision": "adhd_with_substance_use",
+          "label": "Patient has substance use disorder"
+        },
+        {
+          "condition": { "field": "comorbidities", "operator": "contains", "value": "cardiac_history" },
+          "next_decision": "adhd_cardiac_screening",
+          "label": "Patient has cardiac history"
+        },
+        {
+          "condition": { "field": "comorbidities", "operator": "contains", "value": "tics" },
+          "next_decision": "adhd_with_tics",
+          "label": "Patient has tic disorder"
+        },
+        {
+          "condition": { "field": "prior_treatments", "operator": "exists", "value": true },
+          "next_decision": "treatment_failure_pathway",
+          "label": "Patient has prior treatment history"
+        }
+      ]
+    },
+    {
+      "id": "adhd_with_anxiety",
+      "description": "Treatment pathway when ADHD presents with comorbid anxiety disorder",
+      "entry_point": false,
+      "conditions": [
+        { "field": "diagnosis", "operator": "eq", "value": "ADHD" },
+        { "field": "comorbidities", "operator": "contains", "value": "anxiety" }
+      ],
+      "recommendation": {
+        "action": "Consider atomoxetine as first-line (addresses both ADHD and anxiety), OR initiate SSRI for anxiety stabilisation before adding methylphenidate. If anxiety is mild, methylphenidate may be trialled first with close monitoring of anxiety symptoms.",
+        "evidence_grade": "B",
+        "strength": "conditional",
+        "monitoring": "GAD-7 at baseline and at each review to track anxiety symptom trajectory. If methylphenidate started, reassess anxiety at 4 weeks — discontinue if anxiety worsens significantly.",
+        "source_section": "4.2.1",
+        "source_page": 23,
+        "source_text": "When ADHD presents with comorbid anxiety, clinicians should consider whether the anxiety is primary or secondary to ADHD-related functional impairment. Atomoxetine may address both conditions simultaneously. Alternatively, stabilise anxiety with an SSRI before introducing stimulant treatment."
+      },
+      "branches": []
+    },
+    {
+      "id": "adhd_with_depression",
+      "description": "Treatment pathway when ADHD presents with comorbid depressive disorder",
+      "entry_point": false,
+      "conditions": [
+        { "field": "diagnosis", "operator": "eq", "value": "ADHD" },
+        { "field": "comorbidities", "operator": "contains", "value": "depression" }
+      ],
+      "recommendation": {
+        "action": "Treat depression first if moderate-to-severe (PHQ-9 ≥ 15). Initiate SSRI and reassess ADHD symptoms after 8 weeks of adequate antidepressant treatment. If ADHD symptoms persist, add methylphenidate. If depression is mild (PHQ-9 10-14), methylphenidate may be started first as improved ADHD function can secondarily improve mood.",
+        "evidence_grade": "B",
+        "strength": "conditional",
+        "monitoring": "PHQ-9 at baseline, 4 weeks, and 8 weeks. Suicidality risk assessment at each visit during first 3 months of antidepressant treatment.",
+        "source_section": "4.2.2",
+        "source_page": 26,
+        "source_text": "Depression should generally be treated before or concurrently with ADHD when symptoms are moderate to severe. Untreated depression impairs the ability to assess true ADHD symptom burden and treatment response."
+      },
+      "branches": []
+    },
+    {
+      "id": "adhd_with_substance_use",
+      "description": "Treatment pathway when ADHD presents with comorbid substance use disorder",
+      "entry_point": false,
+      "conditions": [
+        { "field": "diagnosis", "operator": "eq", "value": "ADHD" },
+        { "field": "comorbidities", "operator": "contains", "value": "substance_use" }
+      ],
+      "recommendation": {
+        "action": "First-line: atomoxetine (non-stimulant, no abuse potential). If inadequate response after 8-week trial at optimal dose, consider lisdexamfetamine (lower diversion risk than other stimulants due to prodrug mechanism). Avoid immediate-release stimulant formulations. Require substance use stability (minimum 3 months) before initiating stimulant treatment.",
+        "evidence_grade": "B",
+        "strength": "strong",
+        "monitoring": "Urine drug screening at baseline and periodically during treatment. Prescription monitoring programme checks before each stimulant prescription.",
+        "source_section": "4.2.3",
+        "source_page": 29,
+        "source_text": "Non-stimulant medications should be considered first-line when substance use disorder is comorbid with ADHD. Atomoxetine carries no abuse liability. If stimulant treatment is required, lisdexamfetamine is preferred due to its prodrug pharmacokinetics reducing abuse potential."
+      },
+      "branches": []
+    },
+    {
+      "id": "adhd_cardiac_screening",
+      "description": "Required cardiac assessment before pharmacological treatment in patients with cardiac history",
+      "entry_point": false,
+      "conditions": [
+        { "field": "diagnosis", "operator": "eq", "value": "ADHD" },
+        { "field": "comorbidities", "operator": "contains", "value": "cardiac_history" }
+      ],
+      "recommendation": {
+        "action": "Obtain baseline ECG and cardiology review before initiating any ADHD medication. If structural heart disease or significant arrhythmia identified, ADHD pharmacotherapy is contraindicated until cardiologist clearance obtained. If ECG normal and cardiologist approves, proceed with standard first-line treatment with enhanced cardiovascular monitoring.",
+        "evidence_grade": "C",
+        "strength": "strong",
+        "monitoring": "ECG at baseline. Blood pressure and heart rate at each visit. Repeat ECG if symptoms of palpitations, syncope, or exercise intolerance develop.",
+        "source_section": "3.2",
+        "source_page": 14,
+        "source_text": "All patients with a personal or family history of cardiac disease should undergo ECG screening and specialist cardiac review before commencing ADHD pharmacotherapy. Stimulant and non-stimulant medications can affect heart rate, blood pressure, and cardiac rhythm."
+      },
+      "branches": []
+    },
+    {
+      "id": "adhd_with_tics",
+      "description": "Treatment pathway when ADHD presents with comorbid tic disorder",
+      "entry_point": false,
+      "conditions": [
+        { "field": "diagnosis", "operator": "eq", "value": "ADHD" },
+        { "field": "comorbidities", "operator": "contains", "value": "tics" }
+      ],
+      "recommendation": {
+        "action": "Methylphenidate may be used with monitoring — evidence suggests stimulants do not consistently worsen tics. If tics worsen with stimulant initiation, switch to atomoxetine or guanfacine. Alpha-2 agonists (guanfacine, clonidine) may address both ADHD and tics.",
+        "evidence_grade": "B",
+        "strength": "conditional",
+        "monitoring": "Yale Global Tic Severity Scale (YGTSS) at baseline and at each titration visit. If tics worsen by ≥25% on YGTSS, consider medication switch.",
+        "source_section": "4.2.5",
+        "source_page": 33,
+        "source_text": "Current evidence does not support the historical view that stimulants are contraindicated in patients with tic disorders. However, individual patients may experience tic exacerbation and should be monitored closely during titration."
+      },
+      "branches": []
+    },
+    {
+      "id": "treatment_failure_pathway",
+      "description": "Decision pathway when patient has failed prior medication trials",
+      "entry_point": false,
+      "conditions": [
+        { "field": "diagnosis", "operator": "eq", "value": "ADHD" },
+        { "field": "prior_treatments", "operator": "exists", "value": true }
+      ],
+      "recommendation": {
+        "action": "Review prior treatment history systematically. If methylphenidate was trialled: ensure adequate dose (≥1mg/kg/day or maximum tolerated) for adequate duration (≥4 weeks at optimal dose) before declaring treatment failure. If genuinely inadequate response to optimised methylphenidate, switch to lisdexamfetamine/dexamphetamine (alternative stimulant class).",
+        "evidence_grade": "A",
+        "strength": "strong",
+        "monitoring": "ASRS or equivalent rating scale at each visit to objectively measure response.",
+        "source_section": "5.1",
+        "source_page": 38,
+        "source_text": "Before concluding that a stimulant trial has failed, clinicians should verify that the dose has been optimised and the trial duration has been adequate. Switching between stimulant classes (methylphenidate to amphetamine or vice versa) is recommended before moving to non-stimulant options."
+      },
+      "branches": [
+        {
+          "condition": {
+            "field": "prior_treatments",
+            "operator": "any_match",
+            "value": {
+              "conditions": [
+                { "field": "class", "operator": "eq", "value": "stimulant_mph" },
+                { "field": "response", "operator": "eq", "value": "none" }
+              ]
+            }
+          },
+          "next_decision": "switch_to_amphetamine",
+          "label": "Failed methylphenidate class"
+        },
+        {
+          "condition": {
+            "field": "prior_treatments",
+            "operator": "any_match",
+            "value": {
+              "conditions": [
+                { "field": "class", "operator": "eq", "value": "stimulant_amp" },
+                { "field": "response", "operator": "eq", "value": "none" }
+              ]
+            }
+          },
+          "next_decision": "switch_to_non_stimulant",
+          "label": "Failed amphetamine class"
+        }
+      ]
+    },
+    {
+      "id": "switch_to_amphetamine",
+      "description": "Switch to amphetamine class after methylphenidate failure",
+      "entry_point": false,
+      "conditions": [
+        { "field": "diagnosis", "operator": "eq", "value": "ADHD" },
+        {
+          "field": "prior_treatments",
+          "operator": "any_match",
+          "value": {
+            "conditions": [
+              { "field": "class", "operator": "eq", "value": "stimulant_mph" },
+              { "field": "response", "operator": "eq", "value": "none" }
+            ]
+          }
+        }
+      ],
+      "recommendation": {
+        "action": "Switch to lisdexamfetamine 30mg once daily. Titrate by 20mg increments at weekly intervals to a maximum of 70mg/day. Approximately 40% of patients who do not respond to one stimulant class will respond to the other.",
+        "evidence_grade": "A",
+        "strength": "strong",
+        "monitoring": "ASRS at baseline and at each titration step. Blood pressure and heart rate monitoring continues.",
+        "source_section": "5.2",
+        "source_page": 41,
+        "source_text": "Cross-class stimulant switching is a well-established strategy. Network meta-analysis evidence suggests lisdexamfetamine may have a marginally larger effect size than methylphenidate in adults, though both are effective first-line agents."
+      },
+      "branches": []
+    },
+    {
+      "id": "switch_to_non_stimulant",
+      "description": "Move to non-stimulant options after both stimulant classes exhausted",
+      "entry_point": false,
+      "conditions": [
+        { "field": "diagnosis", "operator": "eq", "value": "ADHD" },
+        {
+          "field": "prior_treatments",
+          "operator": "any_match",
+          "value": {
+            "conditions": [
+              { "field": "class", "operator": "eq", "value": "stimulant_amp" },
+              { "field": "response", "operator": "eq", "value": "none" }
+            ]
+          }
+        }
+      ],
+      "recommendation": {
+        "action": "Initiate atomoxetine 40mg once daily for 7 days, then increase to 80mg once daily (or 100mg if body weight >70kg). Allow 6-8 weeks for full therapeutic effect before assessing response. If atomoxetine ineffective or not tolerated, consider guanfacine extended-release or bupropion as third-line options.",
+        "evidence_grade": "A",
+        "strength": "strong",
+        "monitoring": "ASRS at baseline, 4 weeks, and 8 weeks. Monitor for hepatic symptoms (rare but serious with atomoxetine). Blood pressure monitoring for guanfacine.",
+        "source_section": "5.3",
+        "source_page": 44,
+        "source_text": "Atomoxetine is the first-choice non-stimulant for adults with ADHD who have not responded to or cannot tolerate stimulant medications. Clinicians should be aware of the delayed onset of action (6-8 weeks) and counsel patients accordingly to prevent premature discontinuation."
+      },
+      "branches": []
+    },
+    {
+      "id": "pregnancy_considerations",
+      "description": "ADHD medication management during pregnancy",
+      "entry_point": true,
+      "conditions": [
+        { "field": "diagnosis", "operator": "eq", "value": "ADHD" },
+        { "field": "contraindications", "operator": "contains", "value": "pregnancy" }
+      ],
+      "recommendation": {
+        "action": "Discontinue all ADHD medications during pregnancy unless the risk-benefit analysis strongly favours continuation (e.g., safety-critical occupation). If medication is continued, methylphenidate has the most pregnancy safety data. Discuss risks and benefits with the patient and document shared decision-making. Refer for specialist perinatal psychiatric review.",
+        "evidence_grade": "C",
+        "strength": "conditional",
+        "monitoring": "Monthly obstetric review. Neonatal monitoring if medication continued into third trimester.",
+        "source_section": "6.1",
+        "source_page": 48,
+        "source_text": "There is limited safety data for ADHD medications in pregnancy. The default recommendation is discontinuation with non-pharmacological support. Continuation may be considered in individual cases following specialist risk-benefit assessment."
+      },
+      "branches": []
+    },
+    {
+      "id": "breastfeeding_considerations",
+      "description": "ADHD medication management during breastfeeding",
+      "entry_point": true,
+      "conditions": [
+        { "field": "diagnosis", "operator": "eq", "value": "ADHD" },
+        { "field": "contraindications", "operator": "contains", "value": "breastfeeding" }
+      ],
+      "recommendation": {
+        "action": "Methylphenidate is considered the safest option during breastfeeding (minimal transfer to breast milk). Atomoxetine data is limited — use with caution. Amphetamines transfer to breast milk and may cause infant irritability. Discuss with the patient and document shared decision-making.",
+        "evidence_grade": "C",
+        "strength": "conditional",
+        "monitoring": "Monitor infant for irritability, feeding difficulties, or poor weight gain.",
+        "source_section": "6.2",
+        "source_page": 50,
+        "source_text": "If ADHD medication is required during breastfeeding, methylphenidate is preferred due to its low relative infant dose. Infant monitoring is recommended regardless of the agent chosen."
+      },
+      "branches": []
+    },
+    {
+      "id": "non_pharmacological",
+      "description": "Non-pharmacological interventions for adult ADHD",
+      "entry_point": true,
+      "conditions": [
+        { "field": "diagnosis", "operator": "eq", "value": "ADHD" },
+        { "field": "age_group", "operator": "eq", "value": "adult" }
+      ],
+      "recommendation": {
+        "action": "Offer structured psychoeducation about ADHD. Consider CBT adapted for ADHD focusing on organisational skills, time management, and emotional regulation. Coaching and workplace accommodations should be discussed. Non-pharmacological interventions can be used alone (mild symptoms) or alongside medication.",
+        "evidence_grade": "B",
+        "strength": "strong",
+        "monitoring": "Review engagement and functional outcomes at 3 and 6 months.",
+        "source_section": "7.1",
+        "source_page": 54,
+        "source_text": "Non-pharmacological interventions should be offered to all adults with ADHD, either as standalone treatment for mild presentations or as an adjunct to medication for moderate-to-severe presentations."
+      },
+      "branches": []
+    }
+  ]
+}
