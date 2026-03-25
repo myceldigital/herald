@@ -1,0 +1,41 @@
+name: Feature request
+description: Propose an improvement to Herald
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please focus on the real workflow or guideline problem you are trying to solve.
+
+  - type: textarea
+    id: use_case
+    attributes:
+      label: Use case
+      description: What are you trying to do with Herald?
+    validations:
+      required: true
+
+  - type: textarea
+    id: current_gap
+    attributes:
+      label: Current limitation
+      description: What is missing or insufficient today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed_change
+    attributes:
+      label: Proposed change
+      description: What would you like Herald to do instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: example_guideline
+    attributes:
+      label: Example guideline or workflow
+      description: Link a public guideline or describe the scenario if that helps clarify the request.
+    validations:
+      required: false
