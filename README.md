@@ -98,6 +98,7 @@ Herald is not a bedside autopilot. It is tooling for turning guidelines into ins
 - `docs/supported_guidelines.md` - what converts cleanly and what does not
 - `SCHEMA.md` - full decision-tree schema
 - `CONTRIBUTING.md` - contribution workflow and standards
+- `SUPPORT.md` - where to ask questions, report bugs, and discuss ideas
 
 ## Install
 
@@ -278,6 +279,12 @@ To use Herald with a real guideline:
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Discussions And Support
+
+- Use [GitHub Discussions](https://github.com/myceldigital/herald/discussions) for questions, design ideas, and early-stage workflow discussion.
+- Use GitHub Issues for concrete bugs, feature requests, and guideline-compatibility requests.
+- Use private vulnerability reporting for security-sensitive issues. See [SECURITY.md](SECURITY.md).
 
 ## License
 

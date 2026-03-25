@@ -3,3 +3,6 @@ contact_links:
   - name: Questions and ideas
     url: https://github.com/myceldigital/herald/discussions
     about: Use GitHub Discussions for open-ended questions, design ideas, or exploratory conversations.
+  - name: Security reporting
+    url: https://github.com/myceldigital/herald/security/advisories/new
+    about: Report security-sensitive issues privately instead of opening a public issue.

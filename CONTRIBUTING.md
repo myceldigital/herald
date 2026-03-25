@@ -26,6 +26,14 @@ ruff check src/ tests/
 5. New synthetic examples that demonstrate realistic, high-value clinical scenarios.
 6. Public-facing docs that make the trust model and limits clearer.
 
+## Where To Open What
+
+- GitHub Discussions: questions, design discussion, workflow ideas, and "would Herald support this?" conversations.
+- Bug report issue: reproducible breakage in parsing, querying, conversion, CI, packaging, or docs.
+- Feature request issue: concrete proposed change to Herald behavior.
+- Guideline-compatibility issue: a real public guideline that currently converts or parses badly and would be a good target for improvement.
+- Private vulnerability reporting: anything security-sensitive. See `SECURITY.md`.
+
 ## Ground Rules
 
 - Keep runtime querying deterministic.

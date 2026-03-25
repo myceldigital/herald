@@ -7,6 +7,7 @@ body:
     attributes:
       value: |
         Thanks for reporting this. Please include the exact command and enough input context to reproduce the issue.
+        If the problem is really about a specific public guideline converting or parsing badly, use the guideline compatibility template instead.
 
   - type: input
     id: version
