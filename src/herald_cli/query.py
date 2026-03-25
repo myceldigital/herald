@@ -127,12 +127,14 @@ _PRIORITY_ORDER = {
 }
 
 _ENUM_VALUE_ALIASES = {
-    "adult": ("adults",),
-    "adults": ("adult",),
+    "adult": ("adults", "young adult", "young_adult"),
+    "adults": ("adult", "young adult", "young_adult"),
     "child": ("children",),
     "children": ("child",),
     "adolescent": ("adolescents",),
     "adolescents": ("adolescent",),
+    "young adult": ("young_adult", "adult", "adults"),
+    "young_adult": ("young adult", "adult", "adults"),
     "older adult": ("older adults", "elderly"),
     "older adults": ("older adult", "elderly"),
     "elderly": ("older adult", "older adults"),
@@ -141,6 +143,15 @@ _ENUM_VALUE_ALIASES = {
 _COMPOSITE_ENUM_MEMBERS = {
     "children_and_adolescents": ("children", "adolescents", "child", "adolescent"),
 }
+
+_UNIVERSAL_QUERY_FIELDS = frozenset({
+    "diagnosis",
+    "age_group",
+    "age_years",
+    "age",
+    "sex",
+    "gender",
+})
 
 
 class QueryEngine:
@@ -484,7 +495,8 @@ def parse_patient_description(text, guideline=None):
 
     # --- Age ---
     age_match = re.search(
-        r"\b(\d{1,3})\s*(?:year|yr|yo|y/o|[fFmM]\b)", text
+        r"\b(\d{1,3})(?:\s*|-)?(?:years?\s*old|year|yr|yo|y/o|[fFmM]\b)",
+        text,
     )
     if age_match:
         age = int(age_match.group(1))
@@ -545,6 +557,28 @@ def parse_patient_description(text, guideline=None):
     if guideline:
         pf = guideline.get("patient_fields", [])
         fs = guideline.get("field_synonyms", {})
+        diagnosis_fields = [fd for fd in pf if fd.get("field") == "diagnosis"]
+
+        for fd in diagnosis_fields:
+            if "diagnosis" in patient:
+                break
+            kv = (fd.get("values") or []) + (fd.get("known_values") or [])
+            ft = fd.get("type", "string")
+            if ft == "enum" and kv:
+                _extract_enum_field(
+                    text_lower, text, "diagnosis", kv, fs, patient, negated, meta
+                )
+            elif ft == "string":
+                if kv:
+                    _extract_enum_field(
+                        text_lower, text, "diagnosis", kv, fs, patient, negated, meta
+                    )
+                else:
+                    _extract_string_field(text_lower, "diagnosis", fs, patient, meta)
+
+        _derive_contextual_condition_aliases(text_lower, patient, pf, meta)
+        pf = _scope_patient_fields_for_patient(guideline, pf, patient)
+        _propagate_derived_field_aliases(patient, pf, meta)
 
         for fd in pf:
             fn = fd.get("field", "")
@@ -552,7 +586,11 @@ def parse_patient_description(text, guideline=None):
             kv = (fd.get("values") or []) + (fd.get("known_values") or [])
             if fn in patient:
                 if ft == "enum" and kv:
-                    aligned = _align_existing_enum_value(patient[fn], kv)
+                    aligned = _align_existing_enum_value(
+                        patient[fn],
+                        fd.get("values") or kv,
+                        fs,
+                    )
                     if aligned is not None:
                         patient[fn] = aligned
                 continue
@@ -578,6 +616,8 @@ def parse_patient_description(text, guideline=None):
                     )
                 else:
                     _extract_string_field(text_lower, fn, fs, patient, meta)
+
+        _propagate_derived_field_aliases(patient, pf, meta)
 
         # Auto-infer single-value required fields
         for fd in pf:
@@ -705,9 +745,10 @@ def _is_negated(term, tl, negated):
     return any(t in n or n in t for n in negated)
 
 
-def _align_existing_enum_value(value, allowed_values):
+def _align_existing_enum_value(value, allowed_values, canonical_synonyms=None):
     """Map an already-extracted enum value onto the guideline's canonical vocabulary."""
     normalized_value = _normalize(str(value).replace("_", " "))
+    synonym_values = [_normalize(str(item)) for item in (canonical_synonyms or [])]
 
     for candidate in allowed_values:
         normalized_candidate = _normalize(str(candidate).replace("_", " "))
@@ -717,10 +758,199 @@ def _align_existing_enum_value(value, allowed_values):
         }
         candidate_aliases.update(_ENUM_VALUE_ALIASES.get(normalized_candidate, ()))
         candidate_aliases.update(_ENUM_VALUE_ALIASES.get(normalized_value, ()))
+        if isinstance(canonical_synonyms, dict):
+            candidate_aliases.update(
+                _normalize(str(synonym))
+                for synonym in canonical_synonyms.get(candidate, [])
+            )
+        else:
+            candidate_aliases.update(synonym_values)
         if normalized_value in candidate_aliases:
             return candidate
 
     return None
+
+
+def _is_diagnosis_like_field(field_name):
+    return (
+        field_name == "diagnosis"
+        or field_name.endswith("_diagnosis")
+        or field_name == "condition"
+    )
+
+
+def _preferred_diagnosis_field(patient):
+    if "condition" in patient:
+        return "condition"
+    if "diagnosis" in patient:
+        return "diagnosis"
+    for field_name in patient:
+        if field_name.endswith("_diagnosis"):
+            return field_name
+    return None
+
+
+def _decision_matches_known_context(decision, patient, require_diagnosis):
+    """Check whether a decision matches the currently known patient context."""
+    conditions = decision.get("conditions", [])
+    known_conditions = [c for c in conditions if c.get("field") in patient]
+    if not known_conditions:
+        return False
+
+    if require_diagnosis:
+        preferred_field = _preferred_diagnosis_field(patient)
+        diagnosis_conditions = [
+            c for c in known_conditions if _is_diagnosis_like_field(c.get("field", ""))
+        ]
+        if not diagnosis_conditions:
+            return False
+        if preferred_field and not any(
+            condition.get("field") == preferred_field
+            for condition in diagnosis_conditions
+        ):
+            return False
+
+    return all(_condition_matches(condition, patient) for condition in known_conditions)
+
+
+def _collect_relevant_field_names(guideline, patient):
+    """Collect fields used by decisions relevant to the current patient context."""
+    decisions = guideline.get("decisions", [])
+    if not decisions:
+        return set()
+
+    require_diagnosis = any(_is_diagnosis_like_field(field) for field in patient)
+    by_id = {decision.get("id"): decision for decision in decisions if decision.get("id")}
+    seed_ids = [
+        decision["id"]
+        for decision in decisions
+        if decision.get("id")
+        and _decision_matches_known_context(
+            decision, patient, require_diagnosis
+        )
+    ]
+
+    if not seed_ids and not require_diagnosis:
+        seed_ids = [
+            decision["id"]
+            for decision in decisions
+            if decision.get("id") and _decision_matches_known_context(decision, patient, False)
+        ]
+
+    relevant_fields = set()
+    queue = list(seed_ids)
+    visited = set()
+
+    while queue:
+        decision_id = queue.pop()
+        if decision_id in visited:
+            continue
+        visited.add(decision_id)
+        decision = by_id.get(decision_id)
+        if not decision:
+            continue
+
+        for condition in decision.get("conditions", []):
+            field = condition.get("field")
+            if field:
+                relevant_fields.add(field)
+
+        for branch in decision.get("branches", []):
+            branch_condition = branch.get("condition", {})
+            field = branch_condition.get("field")
+            if field:
+                relevant_fields.add(field)
+            next_decision = branch.get("next_decision")
+            if (
+                next_decision
+                and next_decision not in visited
+                and _branch_matches_known_context(branch_condition, patient)
+            ):
+                queue.append(next_decision)
+
+    return relevant_fields
+
+
+def _scope_patient_fields_for_patient(guideline, patient_fields, patient):
+    """Scope extraction to fields relevant to the active diagnosis/module."""
+    if not patient_fields:
+        return []
+
+    relevant_names = set(_UNIVERSAL_QUERY_FIELDS)
+    if any(_is_diagnosis_like_field(field) for field in patient):
+        relevant_names.update(_collect_relevant_field_names(guideline, patient))
+
+    return [
+        field_def
+        for field_def in patient_fields
+        if field_def.get("field") in relevant_names
+    ]
+
+
+def _propagate_derived_field_aliases(patient, patient_fields, meta):
+    """Copy obvious derived aliases when the guideline expects them."""
+    field_names = {field_def.get("field") for field_def in patient_fields}
+
+    if "age" in patient and "age_years" in field_names and "age_years" not in patient:
+        patient["age_years"] = patient["age"]
+        meta.setdefault("age_years", {"source": "derived_from_age"})
+
+    if "sex" in patient and "gender" in field_names and "gender" not in patient:
+        patient["gender"] = patient["sex"]
+        meta.setdefault("gender", {"source": "derived_from_sex"})
+
+    if (
+        "specialist_available" in patient
+        and "specialist_supervision_available" in field_names
+        and "specialist_supervision_available" not in patient
+    ):
+        patient["specialist_supervision_available"] = patient["specialist_available"]
+        meta.setdefault(
+            "specialist_supervision_available",
+            {"source": "derived_from_specialist_available"},
+        )
+
+    if (
+        "episode_type" in patient
+        and "bipolar_episode_type" in field_names
+        and "bipolar_episode_type" not in patient
+    ):
+        patient["bipolar_episode_type"] = patient["episode_type"]
+        meta.setdefault("bipolar_episode_type", {"source": "derived_from_episode_type"})
+
+    if (
+        "bipolar_episode_type" in patient
+        and "phase" in field_names
+        and "phase" not in patient
+    ):
+        patient["phase"] = patient["bipolar_episode_type"]
+        meta.setdefault("phase", {"source": "derived_from_bipolar_episode_type"})
+
+
+def _derive_contextual_condition_aliases(text_lower, patient, patient_fields, meta):
+    """Derive composite condition labels when the guideline encodes a module as one enum."""
+    field_names = {field_def.get("field") for field_def in patient_fields}
+    if "condition" not in field_names or "condition" in patient:
+        return
+
+    if patient.get("diagnosis") == "bipolar_disorder" and (
+        "manic episode" in text_lower or "current episode mania" in text_lower
+    ):
+        patient["condition"] = "bipolar disorder current episode mania"
+        meta.setdefault(
+            "condition",
+            {"source": "derived_from_bipolar_mania_phrase"},
+        )
+
+
+def _branch_matches_known_context(condition, patient):
+    """Only traverse a branch when its discriminator is already known."""
+    field = condition.get("field")
+    if not field:
+        return True
+    if field not in patient:
+        return False
+    return _condition_matches(condition, patient)
 
 
 def _enum_values_match(actual, expected):

@@ -199,6 +199,10 @@ class TestPatientDescriptionParser:
         assert patient.get("sex") == "male"
         assert patient.get("age") == 28
 
+    def test_hyphenated_year_old_age(self):
+        patient = parse_patient_description("35-year-old adult with anxiety")
+        assert patient.get("age") == 35
+
     def test_comorbidities_extracted(self):
         patient = parse_patient_description("Adult with ADHD, comorbid anxiety and depression")
         assert "anxiety" in patient.get("comorbidities", [])
@@ -298,3 +302,403 @@ class TestPatientDescriptionParser:
 
         assert patient.get("diagnosis") == "generalized_anxiety_disorder"
         assert patient.get("age_group") == "adults"
+
+    def test_guideline_parser_prefers_canonical_enum_value_over_known_value(self):
+        guideline = {
+            "patient_fields": [
+                {
+                    "field": "diagnosis",
+                    "type": "enum",
+                    "required": True,
+                    "values": ["ADHD"],
+                    "known_values": ["ADHD", "attention deficit hyperactivity disorder"],
+                },
+            ],
+            "field_synonyms": {
+                "ADHD": ["attention deficit hyperactivity disorder"],
+            },
+        }
+
+        patient = parse_patient_description(
+            "10-year-old child with attention deficit hyperactivity disorder",
+            guideline=guideline,
+        )
+
+        assert patient.get("diagnosis") == "ADHD"
+
+    def test_guideline_parser_scopes_missing_fields_to_relevant_module(self):
+        guideline = {
+            "patient_fields": [
+                {
+                    "field": "diagnosis",
+                    "type": "enum",
+                    "required": True,
+                    "values": ["generalized_anxiety_disorder", "bipolar_disorder"],
+                    "known_values": ["generalized_anxiety_disorder", "bipolar_disorder"],
+                },
+                {
+                    "field": "age_group",
+                    "type": "enum",
+                    "required": True,
+                    "values": ["adult"],
+                    "known_values": ["adult"],
+                },
+                {
+                    "field": "bipolar_episode_type",
+                    "type": "enum",
+                    "required": True,
+                    "values": ["manic", "depressive"],
+                    "known_values": ["manic", "depressive"],
+                },
+                {
+                    "field": "self_harm_history",
+                    "type": "bool",
+                    "required": True,
+                    "values": None,
+                    "known_values": None,
+                },
+            ],
+            "field_synonyms": {
+                "generalized_anxiety_disorder": ["generalized anxiety disorder"],
+                "bipolar_disorder": ["bipolar disorder"],
+            },
+            "decisions": [
+                {
+                    "id": "anxiety_root",
+                    "entry_point": True,
+                    "conditions": [
+                        {
+                            "field": "diagnosis",
+                            "operator": "eq",
+                            "value": "generalized_anxiety_disorder",
+                        },
+                        {"field": "age_group", "operator": "eq", "value": "adult"},
+                    ],
+                    "recommendation": {
+                        "action": "Treat anxiety",
+                        "source_section": "1",
+                        "source_text": "A",
+                    },
+                    "branches": [],
+                },
+                {
+                    "id": "bipolar_root",
+                    "entry_point": True,
+                    "conditions": [
+                        {"field": "diagnosis", "operator": "eq", "value": "bipolar_disorder"},
+                        {"field": "bipolar_episode_type", "operator": "eq", "value": "manic"},
+                    ],
+                    "recommendation": {
+                        "action": "Treat bipolar mania",
+                        "source_section": "2",
+                        "source_text": "B",
+                    },
+                    "branches": [],
+                },
+            ],
+        }
+
+        patient = parse_patient_description(
+            "35F generalized anxiety disorder",
+            guideline=guideline,
+        )
+        meta = patient.get("_extraction_meta", {})
+
+        assert patient.get("diagnosis") == "generalized_anxiety_disorder"
+        assert "bipolar_episode_type" not in meta
+        assert "self_harm_history" not in meta
+
+    def test_guideline_parser_keeps_relevant_required_fields_in_scope(self):
+        guideline = {
+            "patient_fields": [
+                {
+                    "field": "diagnosis",
+                    "type": "enum",
+                    "required": True,
+                    "values": ["bipolar_disorder"],
+                    "known_values": ["bipolar_disorder"],
+                },
+                {
+                    "field": "bipolar_episode_type",
+                    "type": "enum",
+                    "required": True,
+                    "values": ["manic", "depressive"],
+                    "known_values": ["manic", "depressive"],
+                },
+            ],
+            "field_synonyms": {
+                "bipolar_disorder": ["bipolar disorder"],
+            },
+            "decisions": [
+                {
+                    "id": "bipolar_root",
+                    "entry_point": True,
+                    "conditions": [
+                        {"field": "diagnosis", "operator": "eq", "value": "bipolar_disorder"},
+                        {"field": "bipolar_episode_type", "operator": "eq", "value": "manic"},
+                    ],
+                    "recommendation": {
+                        "action": "Treat bipolar mania",
+                        "source_section": "2",
+                        "source_text": "B",
+                    },
+                    "branches": [],
+                },
+            ],
+        }
+
+        patient = parse_patient_description(
+            "42M bipolar disorder",
+            guideline=guideline,
+        )
+        meta = patient.get("_extraction_meta", {})
+
+        assert patient.get("diagnosis") == "bipolar_disorder"
+        assert meta["bipolar_episode_type"]["source"] == "missing"
+
+    def test_guideline_parser_derives_age_years_when_relevant(self):
+        guideline = {
+            "patient_fields": [
+                {
+                    "field": "diagnosis",
+                    "type": "enum",
+                    "required": True,
+                    "values": ["generalized_anxiety_disorder"],
+                    "known_values": ["generalized_anxiety_disorder"],
+                },
+                {
+                    "field": "age_years",
+                    "type": "number",
+                    "required": True,
+                    "values": None,
+                    "known_values": None,
+                },
+            ],
+            "field_synonyms": {
+                "generalized_anxiety_disorder": ["generalized anxiety disorder"],
+            },
+            "decisions": [
+                {
+                    "id": "adult_anxiety",
+                    "entry_point": True,
+                    "conditions": [
+                        {
+                            "field": "diagnosis",
+                            "operator": "eq",
+                            "value": "generalized_anxiety_disorder",
+                        },
+                        {"field": "age_years", "operator": "gte", "value": 18},
+                    ],
+                    "recommendation": {
+                        "action": "Adult anxiety treatment",
+                        "source_section": "1",
+                        "source_text": "A",
+                    },
+                    "branches": [],
+                },
+            ],
+        }
+
+        patient = parse_patient_description(
+            "35F generalized anxiety disorder",
+            guideline=guideline,
+        )
+
+        assert patient.get("age_years") == 35
+
+    def test_guideline_parser_does_not_follow_unknown_branches(self):
+        guideline = {
+            "patient_fields": [
+                {
+                    "field": "diagnosis",
+                    "type": "enum",
+                    "required": True,
+                    "values": ["bipolar_disorder"],
+                    "known_values": ["bipolar_disorder"],
+                },
+                {
+                    "field": "bipolar_episode_type",
+                    "type": "enum",
+                    "required": True,
+                    "values": ["manic", "depressive"],
+                    "known_values": ["manic", "depressive"],
+                },
+                {
+                    "field": "childbearing_potential",
+                    "type": "bool",
+                    "required": True,
+                    "values": None,
+                    "known_values": None,
+                },
+            ],
+            "field_synonyms": {
+                "bipolar_disorder": ["bipolar disorder"],
+            },
+            "decisions": [
+                {
+                    "id": "bipolar_root",
+                    "entry_point": True,
+                    "conditions": [
+                        {"field": "diagnosis", "operator": "eq", "value": "bipolar_disorder"},
+                    ],
+                    "recommendation": {
+                        "action": "Initial bipolar assessment",
+                        "source_section": "1",
+                        "source_text": "A",
+                    },
+                    "branches": [
+                        {
+                            "condition": {
+                                "field": "bipolar_episode_type",
+                                "operator": "eq",
+                                "value": "manic",
+                            },
+                            "next_decision": "mania_branch",
+                        }
+                    ],
+                },
+                {
+                    "id": "mania_branch",
+                    "entry_point": False,
+                    "conditions": [
+                        {"field": "childbearing_potential", "operator": "eq", "value": True},
+                    ],
+                    "recommendation": {
+                        "action": "Escalate mania treatment",
+                        "source_section": "2",
+                        "source_text": "B",
+                    },
+                    "branches": [],
+                },
+            ],
+        }
+
+        patient = parse_patient_description(
+            "42M bipolar disorder",
+            guideline=guideline,
+        )
+        meta = patient.get("_extraction_meta", {})
+
+        assert "bipolar_episode_type" in meta
+        assert "childbearing_potential" not in meta
+
+    def test_guideline_parser_derives_bipolar_condition_phrase(self):
+        guideline = {
+            "patient_fields": [
+                {
+                    "field": "diagnosis",
+                    "type": "enum",
+                    "required": True,
+                    "values": ["bipolar_disorder"],
+                    "known_values": ["bipolar_disorder"],
+                },
+                {
+                    "field": "condition",
+                    "type": "enum",
+                    "required": False,
+                    "values": ["bipolar disorder current episode mania"],
+                    "known_values": ["bipolar disorder current episode mania"],
+                },
+            ],
+            "field_synonyms": {
+                "bipolar_disorder": ["bipolar disorder"],
+            },
+            "decisions": [
+                {
+                    "id": "bipolar_mania",
+                    "entry_point": True,
+                    "conditions": [
+                        {
+                            "field": "condition",
+                            "operator": "eq",
+                            "value": "bipolar disorder current episode mania",
+                        },
+                    ],
+                    "recommendation": {
+                        "action": "Treat bipolar mania",
+                        "source_section": "1",
+                        "source_text": "A",
+                    },
+                    "branches": [],
+                },
+            ],
+        }
+
+        patient = parse_patient_description(
+            "28-year-old adult with bipolar disorder and manic episode",
+            guideline=guideline,
+        )
+
+        assert patient.get("condition") == "bipolar disorder current episode mania"
+
+    def test_guideline_parser_prefers_condition_specific_scope_over_generic_diagnosis(self):
+        guideline = {
+            "patient_fields": [
+                {
+                    "field": "diagnosis",
+                    "type": "enum",
+                    "required": True,
+                    "values": ["bipolar_disorder"],
+                    "known_values": ["bipolar_disorder"],
+                },
+                {
+                    "field": "condition",
+                    "type": "enum",
+                    "required": False,
+                    "values": ["bipolar disorder current episode mania"],
+                    "known_values": ["bipolar disorder current episode mania"],
+                },
+                {
+                    "field": "phase",
+                    "type": "enum",
+                    "required": True,
+                    "values": ["remission"],
+                    "known_values": ["remission"],
+                },
+            ],
+            "field_synonyms": {
+                "bipolar_disorder": ["bipolar disorder"],
+            },
+            "decisions": [
+                {
+                    "id": "mania_path",
+                    "entry_point": True,
+                    "conditions": [
+                        {
+                            "field": "condition",
+                            "operator": "eq",
+                            "value": "bipolar disorder current episode mania",
+                        },
+                    ],
+                    "recommendation": {
+                        "action": "Treat mania",
+                        "source_section": "1",
+                        "source_text": "A",
+                    },
+                    "branches": [],
+                },
+                {
+                    "id": "remission_path",
+                    "entry_point": True,
+                    "conditions": [
+                        {"field": "diagnosis", "operator": "eq", "value": "bipolar_disorder"},
+                        {"field": "phase", "operator": "eq", "value": "remission"},
+                    ],
+                    "recommendation": {
+                        "action": "Treat remission",
+                        "source_section": "2",
+                        "source_text": "B",
+                    },
+                    "branches": [],
+                },
+            ],
+        }
+
+        patient = parse_patient_description(
+            "28-year-old adult with bipolar disorder and manic episode",
+            guideline=guideline,
+        )
+        meta = patient.get("_extraction_meta", {})
+
+        assert patient.get("condition") == "bipolar disorder current episode mania"
+        assert "phase" not in meta

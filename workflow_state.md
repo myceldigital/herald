@@ -6,43 +6,40 @@ Judge
 
 ## Active Objective
 
-Completed: reran the full WHO chunked parse with an explicitly approved longer-than-5-minute runtime budget, then validated and summarized the output quality.
+Rerun the live WHO chunked parse with the new merge heuristic and compare the new merged `patient_fields` against the old output to verify which inflated `required` flags disappear in practice.
 
 ## Task Packet
 
-1. Implement chunking strategy for large guidelines:
-   - Detect large markdown inputs that should not be parsed in one monolithic LLM call.
-   - Split recommendation-heavy documents into section/module chunks using headings and safe fallbacks.
-2. Implement deterministic merge:
-   - Merge chunk-level metadata, patient fields, field synonyms, and decisions.
-   - Handle duplicate decision IDs safely and keep branch references valid.
-3. Add regression coverage:
-   - Unit-test chunk splitting, merge behavior, and chunked parse orchestration without live API calls.
-4. Rerun the WHO test:
-   - Parse the WHO guideline with the new chunked strategy.
-   - Validate fidelity and run representative WHO queries.
-5. Judge the outcome:
-   - Distinguish runtime bugs from remaining extraction-quality limitations.
-   - Update `PROJECT_TECHNICAL_OVERVIEW.md` and `CHANGES_LOG.md`.
+1. Verify live parse prerequisites:
+   - Confirm the WHO normalized markdown input exists.
+   - Confirm the Anthropic API environment is available for a real rerun.
+2. Rerun the chunked WHO parse:
+   - Write a fresh output file instead of overwriting the old JSON.
+   - Allow a long runtime and monitor until completion.
+3. Compare old vs new merged patient fields:
+   - Diff required flags, added/removed fields, and any notable vocabulary/type shifts.
+   - Highlight which previously inflated required fields disappeared.
+4. Judge the outcome:
+   - Distinguish merge-heuristic wins from remaining LLM extraction noise.
+5. Update docs/logs/state with the rerun result.
 
 ## Success Criteria
 
-- Large markdown inputs are parsed via chunking automatically.
-- Chunk merge preserves valid schema output and branch references.
-- New tests cover chunk split/merge behavior and pass locally.
-- WHO parse completes under the new strategy and yields materially better completeness/fidelity than the prior single-pass run.
-- Any code changes are accompanied by updates to `PROJECT_TECHNICAL_OVERVIEW.md` and `CHANGES_LOG.md`.
+- A fresh WHO chunked parse completes successfully with the new merge logic.
+- We can enumerate which `patient_fields.required` flags changed between old and new outputs.
+- The comparison shows real-world reduction of inflated required fields.
+- Docs/logs reflect the rerun and comparison result.
 
 ## Verification Plan
 
-- `python3 -m pytest tests/test_parse.py tests/test_query.py tests/test_cli.py tests/test_convert.py -q`
-- `python3 -m ruff check src tests`
-- `herald parse /tmp/who_mhgap_normalized.md -o /tmp/who_mhgap_chunked.json`
-- `herald validate /tmp/who_mhgap_chunked.json --source /tmp/who_mhgap_normalized.md`
-- Representative WHO queries against the chunked parse output
+- `python3 -m herald_cli.cli parse /tmp/who_mhgap_normalized.md -o /tmp/who_mhgap_chunked_rerun.json`
+- Compare `/tmp/who_mhgap_chunked.json` vs `/tmp/who_mhgap_chunked_rerun.json` with a targeted Python diff
+- If code changed during the turn, rerun targeted tests/lint
 
 ## Judge Outcome
 
-- `stop`: the full WHO chunked parse completed successfully and was evaluated.
-- Output scale improved materially versus the earlier single-pass parse (96 decision nodes instead of 14), and the saved parse metadata confirms `strategy = chunked` with `chunk_count = 23`.
-- Remaining limitations are extraction-quality issues in the merged WHO tree (many partial citation matches and noisy/over-required patient fields), not parser runtime stability.
+- `stop`: the live WHO mhGAP chunked rerun completed successfully with the new merge heuristic.
+- Rerun output: `/tmp/who_mhgap_chunked_rerun.json`, `strategy=chunked`, `chunk_count=23`, `94` decision nodes.
+- Old merged WHO output had `95` patient fields and `20` globally required fields; the rerun has `78` patient fields and only `1` globally required field (`diagnosis`).
+- Required flags that disappeared in practice include `age_group`, `age_years`, `benzodiazepine_response`, `childbearing_potential`, `condition`, `parental_mental_health_condition`, `patient_type`, `phase`, `seizure_type`, `sex`, and `use_pattern`.
+- Runtime spot-checks against the rerun output showed materially cleaner query output with no old cross-module missing-required noise on representative anxiety and bipolar mania queries.

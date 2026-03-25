@@ -326,6 +326,154 @@ Administrative appendix
         assert renamed_first["branches"][0]["next_decision"] == renamed_follow["id"]
         assert merged["field_synonyms"]["moderate"] == ["mid"]
 
+    def test_merge_chunk_trees_demotes_subgroup_only_required_fields(self):
+        chunk_a = {
+            "guideline": {"title": "Test", "source": "WHO"},
+            "patient_fields": [
+                {
+                    "field": "diagnosis",
+                    "type": "enum",
+                    "required": True,
+                    "values": ["anxiety"],
+                },
+                {
+                    "field": "age_group",
+                    "type": "enum",
+                    "required": True,
+                    "values": ["adult"],
+                },
+            ],
+            "field_synonyms": {},
+            "decisions": [
+                {
+                    "id": "anxiety_root",
+                    "description": "Chunk A root",
+                    "entry_point": True,
+                    "conditions": [{"field": "diagnosis", "operator": "eq", "value": "anxiety"}],
+                    "recommendation": {
+                        "action": "A",
+                        "source_section": "3.1",
+                        "source_text": "A text",
+                    },
+                    "branches": [],
+                }
+            ],
+        }
+        chunk_b = {
+            "guideline": {"title": "Test", "source": "WHO"},
+            "patient_fields": [
+                {
+                    "field": "diagnosis",
+                    "type": "enum",
+                    "required": True,
+                    "values": ["bipolar_disorder"],
+                },
+                {
+                    "field": "sex",
+                    "type": "enum",
+                    "required": True,
+                    "values": ["female", "male"],
+                },
+                {
+                    "field": "childbearing_potential",
+                    "type": "bool",
+                    "required": True,
+                    "values": None,
+                },
+            ],
+            "field_synonyms": {},
+            "decisions": [
+                {
+                    "id": "bipolar_root",
+                    "description": "Chunk B root",
+                    "entry_point": True,
+                    "conditions": [
+                        {"field": "diagnosis", "operator": "eq", "value": "bipolar_disorder"},
+                        {"field": "sex", "operator": "eq", "value": "female"},
+                        {"field": "childbearing_potential", "operator": "eq", "value": True},
+                    ],
+                    "recommendation": {
+                        "action": "B",
+                        "source_section": "3.2",
+                        "source_text": "B text",
+                    },
+                    "branches": [],
+                }
+            ],
+        }
+
+        merged = _merge_chunk_trees([chunk_a, chunk_b])
+        by_name = {field["field"]: field for field in merged["patient_fields"]}
+
+        assert by_name["diagnosis"]["required"] is True
+        assert by_name["sex"]["required"] is False
+        assert by_name["childbearing_potential"]["required"] is False
+
+    def test_merge_chunk_trees_keeps_broadly_shared_required_fields(self):
+        chunk_a = {
+            "guideline": {"title": "Test", "source": "WHO"},
+            "patient_fields": [
+                {
+                    "field": "diagnosis",
+                    "type": "enum",
+                    "required": True,
+                    "values": ["anxiety"],
+                },
+                {
+                    "field": "age_group",
+                    "type": "enum",
+                    "required": True,
+                    "values": ["adult"],
+                },
+            ],
+            "field_synonyms": {},
+            "decisions": [],
+        }
+        chunk_b = {
+            "guideline": {"title": "Test", "source": "WHO"},
+            "patient_fields": [
+                {
+                    "field": "diagnosis",
+                    "type": "enum",
+                    "required": True,
+                    "values": ["depression"],
+                },
+                {
+                    "field": "age_group",
+                    "type": "enum",
+                    "required": True,
+                    "values": ["adult"],
+                },
+            ],
+            "field_synonyms": {},
+            "decisions": [],
+        }
+        chunk_c = {
+            "guideline": {"title": "Test", "source": "WHO"},
+            "patient_fields": [
+                {
+                    "field": "diagnosis",
+                    "type": "enum",
+                    "required": True,
+                    "values": ["bipolar_disorder"],
+                },
+                {
+                    "field": "age_group",
+                    "type": "enum",
+                    "required": True,
+                    "values": ["adult"],
+                },
+            ],
+            "field_synonyms": {},
+            "decisions": [],
+        }
+
+        merged = _merge_chunk_trees([chunk_a, chunk_b, chunk_c])
+        by_name = {field["field"]: field for field in merged["patient_fields"]}
+
+        assert by_name["diagnosis"]["required"] is True
+        assert by_name["age_group"]["required"] is True
+
     def test_parse_guideline_uses_chunked_strategy_for_large_input(self, monkeypatch):
         markdown = """
 Title

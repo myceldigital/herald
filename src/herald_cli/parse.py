@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import re
 from copy import deepcopy
@@ -14,6 +15,8 @@ DEFAULT_MAX_OUTPUT_TOKENS = 20000
 CHUNK_PARSE_CHAR_THRESHOLD = 30000
 CHUNK_TARGET_CHARS = 18000
 CHUNK_SHARED_CONTEXT_CHARS = 5000
+MERGED_REQUIRED_CHUNK_SHARE = 0.6
+ALWAYS_REQUIRED_MERGED_FIELDS = frozenset({"diagnosis"})
 
 # ---------------------------------------------------------------------------
 # Schema models (Pydantic)
@@ -622,17 +625,20 @@ def _merge_chunk_trees(chunk_trees: list[dict]) -> dict:
     if not chunk_trees:
         raise RuntimeError("No chunk trees were produced during chunked parse.")
 
+    patient_field_lists = [tree.get("patient_fields", []) for tree in chunk_trees]
     merged = {
         "schema_version": "0.1",
         "guideline": _merge_guideline_meta([tree.get("guideline", {}) for tree in chunk_trees]),
-        "patient_fields": _merge_patient_fields(
-            [tree.get("patient_fields", []) for tree in chunk_trees]
-        ),
+        "patient_fields": _merge_patient_fields(patient_field_lists),
         "field_synonyms": _merge_field_synonyms(
             [tree.get("field_synonyms", {}) for tree in chunk_trees]
         ),
         "decisions": _merge_decisions([tree.get("decisions", []) for tree in chunk_trees]),
     }
+    merged["patient_fields"] = _refine_merged_required_fields(
+        merged["patient_fields"],
+        patient_field_lists,
+    )
     return merged
 
 
@@ -695,6 +701,69 @@ def _merge_patient_fields(field_lists: list[list[dict]]) -> list[dict]:
             current["known_values"] = merged_known if merged_known else None
 
     return list(merged.values())
+
+
+def _refine_merged_required_fields(
+    merged_fields: list[dict],
+    field_lists: list[list[dict]],
+) -> list[dict]:
+    """Demote chunk-local required fields that should not be global after merge."""
+    total_chunks = len(field_lists)
+    if total_chunks <= 1:
+        return merged_fields
+
+    stats = _build_field_chunk_stats(field_lists)
+    minimum_global_chunks = max(2, math.ceil(total_chunks * MERGED_REQUIRED_CHUNK_SHARE))
+
+    for field in merged_fields:
+        name = field.get("field")
+        if not name:
+            continue
+        if not field.get("required"):
+            continue
+        if name in ALWAYS_REQUIRED_MERGED_FIELDS:
+            continue
+
+        field_stats = stats.get(name, {})
+        required_chunks = field_stats.get("required_chunks", 0)
+        present_chunks = field_stats.get("present_chunks", 0)
+
+        keep_required = (
+            required_chunks == total_chunks
+            or (
+                required_chunks == present_chunks
+                and required_chunks >= minimum_global_chunks
+            )
+        )
+        field["required"] = keep_required
+
+    return merged_fields
+
+
+def _build_field_chunk_stats(field_lists: list[list[dict]]) -> dict[str, dict[str, int]]:
+    """Track how widely each field appears and is marked required across chunks."""
+    stats: dict[str, dict[str, int]] = {}
+
+    for fields in field_lists:
+        present_names = set()
+        required_names = set()
+
+        for field in fields:
+            name = field.get("field")
+            if not name:
+                continue
+            present_names.add(name)
+            if field.get("required"):
+                required_names.add(name)
+
+        for name in present_names:
+            stats.setdefault(name, {"present_chunks": 0, "required_chunks": 0})
+            stats[name]["present_chunks"] += 1
+        for name in required_names:
+            stats.setdefault(name, {"present_chunks": 0, "required_chunks": 0})
+            stats[name]["required_chunks"] += 1
+
+    return stats
 
 
 def _merge_field_synonyms(synonym_maps: list[dict[str, list[str]]]) -> dict[str, list[str]]:
