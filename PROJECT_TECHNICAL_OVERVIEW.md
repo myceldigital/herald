@@ -23,15 +23,17 @@ tests/
 ├── test_convert.py   # Markdown normalization (5 tests)
 ├── test_cli.py       # CLI error handling (3 tests)
 ├── test_parse.py     # Schema models + chunk split/merge + requiredness demotion + reference validation
-├── test_query.py     # Query engine + NLP patient parser + scoped field extraction/normalization
+├── test_query.py     # Query engine + NLP patient parser + scoped field extraction/normalization + shipped example coverage
 ├── test_validate.py  # Source text verification (5 tests)
 ├── test_diff.py      # Guideline version diffing (21 tests)
 └── test_export.py    # FHIR PlanDefinition export (40 tests)
 
 examples/
-├── synthetic_adhd_guideline.json   # Pre-parsed synthetic guideline for demo/testing
-├── synthetic_adhd_guideline.md     # Source markdown for the synthetic guideline
-└── demo.py                         # Example usage script
+├── synthetic_adhd_guideline.json        # Pre-parsed chronic-care synthetic guideline
+├── synthetic_adhd_guideline.md          # Source markdown for the ADHD example
+├── synthetic_meningitis_guideline.json  # Pre-parsed acute-care synthetic guideline
+├── synthetic_meningitis_guideline.md    # Source markdown for the meningitis example
+└── demo.py                              # Example usage script across both examples
 ```
 
 ## Key Modules
@@ -52,6 +54,15 @@ examples/
 
 - Wraps expected runtime/data failures (`RuntimeError`, `ValueError`, `OSError`, JSON decode errors) as `click.ClickException`, so the CLI prints clean `Error: ...` messages instead of Python tracebacks.
 - Manual CLI coverage now includes `--help`, `--version`, `convert`, `parse` missing-key failure path, `query`, `validate`, `diff`, `export`, batch query, audit logging, and multi-guideline query.
+
+## Public Repo Surfaces
+
+- `README.md` is the main product-facing surface. It now leads with a deterministic/auditable positioning statement, a 30-second acute-care demo, a trust-model comparison vs generic chatbots, a shipped-features table, and direct links into the docs/schema.
+- GitHub repo metadata now matches that positioning more closely: the remote description was updated to emphasize deterministic/auditable source-cited guideline infrastructure, and the repo topics were expanded for discovery (`decision-engine`, `ehr`, `medical-informatics`, `guidelines-as-code`).
+- `docs/adding_your_own.md` now reflects the real operating flow: convert, inspect markdown, parse, validate, query, and manually refine if needed.
+- `docs/supported_guidelines.md` now frames support mainly in terms of document structure and markdown quality, which is what actually determines parse reliability.
+- `CONTRIBUTING.md` now emphasizes deterministic behavior, source traceability, synthetic/licensed content only, and public-doc clarity as core contribution constraints.
+- Package metadata in `pyproject.toml` now describes Herald as deterministic/auditable guideline infrastructure and includes stronger discovery keywords.
 
 ### `parse.py` — LLM Extraction
 
@@ -92,8 +103,16 @@ examples/
 ```bash
 pip install -e ".[dev]"        # Install with dev deps (pytest, ruff, pytest-cov)
 ruff check src/ tests/         # Lint
-pytest tests/ -v --tb=short    # Run tests (121 tests)
+pytest tests/ -v --tb=short    # Run tests
 pytest tests/ --cov=herald_cli # Coverage report
+```
+
+Recent targeted verification for the repo-surface refresh:
+
+```bash
+pytest tests/test_query.py -q   # 34 passed
+ruff check src/ tests/          # passed
+PYTHONPATH=src python3 examples/demo.py  # passed
 ```
 
 ## Workflow Discipline
@@ -115,10 +134,10 @@ Decision trees follow Herald Schema v0.1 (see `SCHEMA.md`). Every recommendation
 
 ## Known Issues
 
-- Repo state: `Desktop/herald` has source files deleted from HEAD. Full project only in Downloads copies.
 - `query.py` coverage is still relatively low for the full NLP extraction surface and multi-guideline behavior.
 - Real WHO PDF conversion still includes repeated running headers/page numbers and some OCR-style spacing artifacts such as `E xecutive summar y`, even though form-feed control characters are now stripped.
 - Multi-guideline queries return duplicate recommendations if equivalent guidelines are loaded more than once; no deduplication layer exists yet.
+- Branch fan-out can still produce duplicate near-equivalent recommendations when multiple conditions point to conceptually similar downstream nodes.
 - After chunked parsing, the saved WHO mhGAP parse now contains 96 decision nodes and representative queries for anxiety, ADHD, bipolar mania, and canonical-phrase depression return recommendations. The main remaining limitation is extraction fidelity, not parser/runtime stability.
 - Real-world large-guideline extraction still depends heavily on the model producing good local condition vocab. For example, some WHO diagnoses/age buckets were emitted in awkward canonical forms (`moderate_to_severe_depression`, `children_and_adolescents`) that required extra query normalization.
 - Chunk merge now down-ranks subgroup-only required fields for future merged parses. A fresh WHO mhGAP rerun confirmed the effect in practice: global required fields dropped from 20 in the older merged JSON to 1 (`diagnosis`) in the rerun output, and old whole-guideline required flags such as `age_group`, `age_years`, `sex`, `childbearing_potential`, `phase`, `condition`, and `seizure_type` disappeared.

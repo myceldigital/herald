@@ -6,40 +6,42 @@ Judge
 
 ## Active Objective
 
-Rerun the live WHO chunked parse with the new merge heuristic and compare the new merged `patient_fields` against the old output to verify which inflated `required` flags disappear in practice.
+Refresh Herald's repo-facing presentation so the README and supporting docs clearly communicate the real shipped product, trust model, and highest-value use cases, and add a stronger acute-care demo asset that matches the thesis.
 
 ## Task Packet
 
-1. Verify live parse prerequisites:
-   - Confirm the WHO normalized markdown input exists.
-   - Confirm the Anthropic API environment is available for a real rerun.
-2. Rerun the chunked WHO parse:
-   - Write a fresh output file instead of overwriting the old JSON.
-   - Allow a long runtime and monitor until completion.
-3. Compare old vs new merged patient fields:
-   - Diff required flags, added/removed fields, and any notable vocabulary/type shifts.
-   - Highlight which previously inflated required fields disappeared.
-4. Judge the outcome:
-   - Distinguish merge-heuristic wins from remaining LLM extraction noise.
-5. Update docs/logs/state with the rerun result.
+1. Rewrite the repo front door:
+   - Replace the README top section with a stronger product pitch, 30-second demo, trust model, serious use cases, current feature inventory, and explicit limits.
+   - Remove shipped-vs-roadmap contradictions (for example FHIR export already exists).
+2. Tighten supporting public docs:
+   - Update `docs/adding_your_own.md`, `docs/supported_guidelines.md`, and `CONTRIBUTING.md` so they reinforce the README and reduce ambiguity for visitors.
+   - Refresh package metadata in `pyproject.toml` where it affects public discovery.
+3. Add a stronger demo artifact:
+   - Create a synthetic acute-care guideline example that demonstrates the "3am citable answer" story.
+   - Add a targeted test to ensure the example produces the expected recommendation path.
+4. Update project records and verify:
+   - Update `PROJECT_TECHNICAL_OVERVIEW.md` and `CHANGES_LOG.md`.
+   - Run targeted lint/tests on the touched files.
 
 ## Success Criteria
 
-- A fresh WHO chunked parse completes successfully with the new merge logic.
-- We can enumerate which `patient_fields.required` flags changed between old and new outputs.
-- The comparison shows real-world reduction of inflated required fields.
-- Docs/logs reflect the rerun and comparison result.
+- The README clearly explains what Herald is, why it is different from ChatGPT, why people should trust it, who it is for, and what ships today.
+- Public docs no longer contradict the current CLI surface.
+- The repo includes an acute-care example that makes the core value proposition obvious.
+- Project overview/log/state reflect the documentation/demo refresh.
+- Targeted tests and lint pass for touched files.
 
 ## Verification Plan
 
-- `python3 -m herald_cli.cli parse /tmp/who_mhgap_normalized.md -o /tmp/who_mhgap_chunked_rerun.json`
-- Compare `/tmp/who_mhgap_chunked.json` vs `/tmp/who_mhgap_chunked_rerun.json` with a targeted Python diff
-- If code changed during the turn, rerun targeted tests/lint
+- `pytest tests/test_query.py -q`
+- `ruff check README.md docs/ src/ tests/`
+- Read lints for touched files after edits
 
 ## Judge Outcome
 
-- `stop`: the live WHO mhGAP chunked rerun completed successfully with the new merge heuristic.
-- Rerun output: `/tmp/who_mhgap_chunked_rerun.json`, `strategy=chunked`, `chunk_count=23`, `94` decision nodes.
-- Old merged WHO output had `95` patient fields and `20` globally required fields; the rerun has `78` patient fields and only `1` globally required field (`diagnosis`).
-- Required flags that disappeared in practice include `age_group`, `age_years`, `benzodiazepine_response`, `childbearing_potential`, `condition`, `parental_mental_health_condition`, `patient_type`, `phase`, `seizure_type`, `sex`, and `use_pattern`.
-- Runtime spot-checks against the rerun output showed materially cleaner query output with no old cross-module missing-required noise on representative anxiety and bipolar mania queries.
+- `stop`: the repo-surface refresh landed cleanly and meets the bounded packet.
+- `README.md` now leads with the deterministic trust model, stronger acute-care demo, shipped feature inventory, and clearer boundaries.
+- GitHub repo metadata now matches the new positioning more closely via an updated description and broader discovery topics.
+- `docs/adding_your_own.md`, `docs/supported_guidelines.md`, `CONTRIBUTING.md`, and `pyproject.toml` now align with the actual product surface and public positioning.
+- A new shipped acute-care example was added in `examples/synthetic_meningitis_guideline.{md,json}` and the demo script now showcases both acute-care and chronic-care paths.
+- Targeted verification passed: `pytest tests/test_query.py -q`, `ruff check src/ tests/`, and `PYTHONPATH=src python3 examples/demo.py`.

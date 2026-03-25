@@ -18,6 +18,19 @@ def adhd_engine():
     return QueryEngine(data)
 
 
+@pytest.fixture
+def meningitis_data():
+    """Load the synthetic acute meningitis guideline."""
+    path = EXAMPLES_DIR / "synthetic_meningitis_guideline.json"
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+@pytest.fixture
+def meningitis_engine(meningitis_data):
+    """Load the synthetic acute meningitis guideline."""
+    return QueryEngine(meningitis_data)
+
+
 class TestQueryEngine:
     """Tests for deterministic decision tree traversal."""
 
@@ -182,6 +195,32 @@ class TestQueryEngine:
         for r in results:
             assert "path" in r
             assert len(r["path"]) >= 1
+
+    def test_meningitis_older_adult_adds_listeria_coverage(
+        self, meningitis_data, meningitis_engine
+    ):
+        patient = parse_patient_description(
+            "68F, suspected meningitis",
+            guideline=meningitis_data,
+        )
+
+        results = meningitis_engine.query(patient)
+
+        assert len(results) >= 1
+        assert "ampicillin" in results[0]["recommendation"]["action"].lower()
+        assert results[0]["recommendation"]["source_section"] == "2.2"
+
+    def test_meningitis_beta_lactam_anaphylaxis_pathway(self, meningitis_data, meningitis_engine):
+        patient = parse_patient_description(
+            "42M, suspected meningitis, severe penicillin allergy",
+            guideline=meningitis_data,
+        )
+
+        results = meningitis_engine.query(patient)
+        actions = " ".join(r["recommendation"]["action"] for r in results).lower()
+
+        assert "non-beta-lactam" in actions
+        assert "dexamethasone" in actions
 
 
 class TestPatientDescriptionParser:

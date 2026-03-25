@@ -1,27 +1,53 @@
-# Contributing to herald
+# Contributing To Herald
 
-Thanks for your interest. This project makes clinical practice guidelines computable — contributions from both developers and clinicians are valuable.
+Herald sits at the boundary between software engineering and clinical logic. Good contributions can come from either side, but they need to preserve the project's core properties:
 
-## Getting started
+- deterministic query behavior
+- auditable source traceability
+- clear public documentation
+- synthetic or properly licensed content only
+
+## Getting Started
 
 ```bash
 git clone https://github.com/myceldigital/herald.git
 cd herald
 pip install -e ".[dev]"
 pytest tests/ -v
+ruff check src/ tests/
 ```
 
-## High-impact contributions
+## Highest-Impact Contributions
 
-1. **Testing against real guideline formats** — does `herald convert` handle your guideline's PDF structure?
-2. **Schema improvements** — edge cases in clinical decision logic the schema doesn't cover yet
-3. **Query engine features** — new operators, better NL parsing, multi-guideline queries
-4. **Synthetic guidelines** — new conditions (depression, hypertension, diabetes)
+1. Real-world PDF conversion hardening for guideline layouts that currently degrade in markdown.
+2. Parse quality improvements that increase source fidelity without hiding uncertainty.
+3. Query engine improvements for deterministic clinical logic traversal.
+4. Better exports and interoperability for CDS workflows.
+5. New synthetic examples that demonstrate realistic, high-value clinical scenarios.
+6. Public-facing docs that make the trust model and limits clearer.
 
-## Code style
+## Ground Rules
 
-Python 3.10+, ruff for linting, type hints on all functions, tests for all new code.
+- Keep runtime querying deterministic.
+- Do not hide provenance. If a recommendation loses source traceability, that is a regression.
+- Do not ship copyrighted clinical content into the repo.
+- Label all demo/example content clearly when it is synthetic.
+- Prefer simple, inspectable data structures over clever abstractions.
 
-## Clinical accuracy
+## Testing
 
-Synthetic guidelines must be clearly labelled as fictional. Do not copy copyrighted guideline text. Clinical logic should be evidence-informed but marked as demonstration, not clinical advice.
+- Add or update tests for every behavior change.
+- Prefer real examples and concrete decision trees over mocked behavior.
+- If you add a new example guideline, add a targeted query test that proves it works.
+
+## Code Style
+
+- Python 3.10+
+- type hints on new/edited functions
+- `ruff` clean
+- readable CLI output
+- docs updated when the public behavior changes
+
+## Clinical Accuracy And Safety Boundary
+
+Herald is open source infrastructure for computable guidelines. It is not a substitute for clinical review. Contributions should make that boundary clearer, not blur it.

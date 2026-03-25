@@ -1,34 +1,63 @@
-# Adding your own guidelines
+# Adding Your Own Guidelines
 
-## Before you start
+Use this flow when you want to take a real guideline PDF and turn it into a local, queryable Herald artifact.
 
-1. **Check the licence.** NICE requires a separate AI licence. WHO publishes some under CC BY-NC-SA. Check before converting.
-2. **Get the full PDF.** Use the complete guideline, not the summary version.
-3. **Ensure selectable text.** If you can't highlight text in the PDF, run OCR first (e.g., `ocrmypdf`).
+## Before You Start
 
-## The pipeline
+1. Check the licence. NICE, WHO, specialty societies, and hospitals all have different reuse rules.
+2. Get the full guideline PDF, not the executive summary.
+3. Make sure the PDF has selectable text. If not, run OCR first, for example with `ocrmypdf`.
+4. Expect to review the parse. Herald is designed for auditable extraction, not blind trust.
+
+## Recommended Workflow
 
 ```bash
-# Step 1: Convert PDF → markdown (no LLM needed)
+# 1. Convert PDF -> markdown
 herald convert your-guideline.pdf -o your-guideline.md
 
-# Step 2: Review the markdown — fix any formatting issues
+# 2. Inspect the markdown
+#    Check headings, tables, recommendation sections, and page/section structure
 
-# Step 3: Parse markdown → decision tree (needs API key)
+# 3. Parse markdown -> decision tree JSON
 export ANTHROPIC_API_KEY=sk-ant-...
 herald parse your-guideline.md -o your-guideline.json
 
-# Step 4: Validate the parse against the source
+# 4. Validate the extracted source text against the markdown
 herald validate your-guideline.json --source your-guideline.md
 
-# Step 5: Query
+# 5. Query the result locally
 herald query your-guideline.json
 ```
 
-## Improving parse quality
+## What Good Input Looks Like
 
-If the initial parse misses recommendations or gets decision logic wrong:
+Herald works best when the guideline has:
 
-1. **Simplify the input.** Extract just the recommendation chapters and parse those.
-2. **Try a stronger model.** `--model claude-opus-4-20250514` may handle complex guidelines better.
-3. **Manual refinement.** The JSON is human-readable — edit nodes, fix conditions, add branches directly.
+- clear numbered sections
+- recommendation-heavy prose rather than image-only flowcharts
+- explicit treatment statements
+- stable clinical vocabulary
+
+If the PDF is messy, fix the markdown before parsing. A cleaner `guideline.md` usually beats throwing a stronger model at a bad input.
+
+## Improving Parse Quality
+
+If the first parse is not good enough:
+
+1. Narrow the markdown to recommendation chapters first.
+2. Remove junk such as repeated headers, footers, and OCR artifacts.
+3. Try a stronger model with `--model`.
+4. Manually refine the JSON. Herald artifacts are meant to be inspectable and editable.
+5. Re-run `herald validate` until the fidelity report is acceptable for your use case.
+
+## Suggested Review Checklist
+
+- Do the decision entry points match the guideline's main pathways?
+- Do all important recommendations have `source_text` and `source_section`?
+- Are required patient fields reasonable, or did the parse overfit to one subsection?
+- Do high-risk recommendations have the right contraindications, urgency, and dosing details?
+- Do representative patient queries return the expected path?
+
+## Local-First By Design
+
+Once you have a parsed JSON file, querying does not require an API key. That makes Herald useful for local review workflows, offline distribution, and controlled deployment environments where runtime LLM calls are unacceptable.

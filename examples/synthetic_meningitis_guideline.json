@@ -1,0 +1,192 @@
+{
+  "schema_version": "0.1",
+  "guideline": {
+    "title": "Synthetic Acute Bacterial Meningitis Guideline",
+    "short_title": "Synthetic Meningitis",
+    "source": "Synthetic Example Guideline Consortium (SEGC)",
+    "version": "1.0",
+    "last_updated": "2026-03-25",
+    "url": null,
+    "condition": "meningitis",
+    "population": "Adults"
+  },
+  "patient_fields": [
+    {
+      "field": "diagnosis",
+      "type": "string",
+      "required": true,
+      "description": "Suspected diagnosis",
+      "known_values": ["meningitis"]
+    },
+    {
+      "field": "age_group",
+      "type": "enum",
+      "values": ["child", "adolescent", "adult", "elderly"],
+      "required": true,
+      "description": "Patient age category"
+    },
+    {
+      "field": "sex",
+      "type": "enum",
+      "values": ["male", "female"],
+      "required": false,
+      "description": "Patient sex"
+    },
+    {
+      "field": "comorbidities",
+      "type": "list[string]",
+      "required": false,
+      "description": "Active comorbid conditions",
+      "known_values": ["immunocompromised"]
+    },
+    {
+      "field": "contraindications",
+      "type": "list[string]",
+      "required": false,
+      "description": "Active contraindications",
+      "known_values": ["severe_penicillin_anaphylaxis"]
+    }
+  ],
+  "field_synonyms": {
+    "meningitis": ["acute meningitis", "bacterial meningitis", "suspected meningitis"],
+    "immunocompromised": ["immunosuppressed", "immunocompromised", "neutropenic"],
+    "severe_penicillin_anaphylaxis": ["penicillin anaphylaxis", "beta-lactam anaphylaxis", "severe penicillin allergy"]
+  },
+  "decisions": [
+    {
+      "id": "adult_empiric_therapy",
+      "description": "Immediate empiric antibiotics for adults with suspected bacterial meningitis",
+      "entry_point": true,
+      "conditions": [
+        { "field": "diagnosis", "operator": "eq", "value": "meningitis" },
+        { "field": "age_group", "operator": "any_match", "value": ["adult", "elderly"] }
+      ],
+      "recommendation": {
+        "action": "Start ceftriaxone plus vancomycin immediately.",
+        "evidence_grade": "A",
+        "strength": "strong",
+        "priority": "critical",
+        "pre_actions": [
+          "Take blood cultures immediately if this does not delay antibiotics."
+        ],
+        "source_section": "2.1",
+        "source_page": 13,
+        "source_text": "Administer ceftriaxone plus vancomycin immediately when acute bacterial meningitis is suspected in adults."
+      },
+      "branches": [
+        {
+          "condition": { "field": "age_group", "operator": "eq", "value": "elderly" },
+          "next_decision": "listeria_coverage_for_older_adults",
+          "label": "Age 50 years or older"
+        },
+        {
+          "condition": { "field": "comorbidities", "operator": "contains", "value": "immunocompromised" },
+          "next_decision": "listeria_coverage_for_immunocompromised_adults",
+          "label": "Immunocompromised adult"
+        },
+        {
+          "condition": { "field": "contraindications", "operator": "contains", "value": "severe_penicillin_anaphylaxis" },
+          "next_decision": "beta_lactam_anaphylaxis_pathway",
+          "label": "Immediate beta-lactam anaphylaxis"
+        }
+      ]
+    },
+    {
+      "id": "listeria_coverage_for_older_adults",
+      "description": "Add Listeria coverage in older adults",
+      "entry_point": false,
+      "conditions": [
+        { "field": "diagnosis", "operator": "eq", "value": "meningitis" },
+        { "field": "age_group", "operator": "eq", "value": "elderly" }
+      ],
+      "recommendation": {
+        "action": "Start ceftriaxone plus vancomycin immediately and add ampicillin for Listeria coverage.",
+        "evidence_grade": "A",
+        "strength": "strong",
+        "priority": "critical",
+        "dosing": {
+          "dose": "Ampicillin 2 g",
+          "route": "IV",
+          "frequency": "every 4 hours",
+          "duration": "empiric therapy until cultures refine treatment",
+          "weight_based": false
+        },
+        "source_section": "2.2",
+        "source_page": 14,
+        "source_text": "In adults aged 50 years or older, add ampicillin to the empiric regimen to cover Listeria."
+      },
+      "branches": []
+    },
+    {
+      "id": "listeria_coverage_for_immunocompromised_adults",
+      "description": "Add Listeria coverage in immunocompromised adults",
+      "entry_point": false,
+      "conditions": [
+        { "field": "diagnosis", "operator": "eq", "value": "meningitis" },
+        { "field": "comorbidities", "operator": "contains", "value": "immunocompromised" }
+      ],
+      "recommendation": {
+        "action": "Start ceftriaxone plus vancomycin immediately and add ampicillin for Listeria coverage.",
+        "evidence_grade": "A",
+        "strength": "strong",
+        "priority": "critical",
+        "dosing": {
+          "dose": "Ampicillin 2 g",
+          "route": "IV",
+          "frequency": "every 4 hours",
+          "duration": "empiric therapy until cultures refine treatment",
+          "weight_based": false
+        },
+        "source_section": "2.2",
+        "source_page": 14,
+        "source_text": "In immunocompromised adults, add ampicillin to the empiric regimen because Listeria coverage is required."
+      },
+      "branches": []
+    },
+    {
+      "id": "beta_lactam_anaphylaxis_pathway",
+      "description": "Alternative pathway for immediate beta-lactam anaphylaxis",
+      "entry_point": false,
+      "conditions": [
+        { "field": "diagnosis", "operator": "eq", "value": "meningitis" },
+        { "field": "contraindications", "operator": "contains", "value": "severe_penicillin_anaphylaxis" }
+      ],
+      "recommendation": {
+        "action": "Seek urgent infectious diseases advice and use a non-beta-lactam empiric regimen.",
+        "evidence_grade": "B",
+        "strength": "strong",
+        "priority": "critical",
+        "source_section": "2.3",
+        "source_page": 15,
+        "source_text": "If there is a history of immediate beta-lactam anaphylaxis, seek urgent specialist advice and use a non-beta-lactam empiric regimen."
+      },
+      "branches": []
+    },
+    {
+      "id": "adjunctive_dexamethasone",
+      "description": "Adjunctive corticosteroid therapy in suspected bacterial meningitis",
+      "entry_point": true,
+      "conditions": [
+        { "field": "diagnosis", "operator": "eq", "value": "meningitis" },
+        { "field": "age_group", "operator": "any_match", "value": ["adult", "elderly"] }
+      ],
+      "recommendation": {
+        "action": "Give dexamethasone before or with the first dose of antibiotics.",
+        "evidence_grade": "A",
+        "strength": "strong",
+        "priority": "urgent",
+        "dosing": {
+          "dose": "10 mg",
+          "route": "IV",
+          "frequency": "every 6 hours",
+          "duration": "4 days",
+          "weight_based": false
+        },
+        "source_section": "2.4",
+        "source_page": 16,
+        "source_text": "Give dexamethasone before or with the first dose of antibiotics when bacterial meningitis is strongly suspected."
+      },
+      "branches": []
+    }
+  ]
+}

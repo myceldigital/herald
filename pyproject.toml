@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "herald-cpg"
 version = "0.1.0"
-description = "Turn clinical practice guideline PDFs into queryable decision engines."
+description = "Turn clinical guideline PDFs into deterministic, auditable decision engines."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
@@ -18,7 +18,11 @@ keywords = [
     "clinical-decision-support",
     "cpg",
     "medical-ai",
+    "deterministic-ai",
+    "auditable-ai",
     "fhir",
+    "medical-informatics",
+    "guidelines-as-code",
     "herald",
 ]
 classifiers = [
@@ -62,6 +66,7 @@ herald = "herald_cli.cli:cli"
 Homepage = "https://github.com/myceldigital/herald"
 Repository = "https://github.com/myceldigital/herald"
 Issues = "https://github.com/myceldigital/herald/issues"
+Documentation = "https://github.com/myceldigital/herald#readme"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/herald_cli"]
