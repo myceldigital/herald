@@ -47,6 +47,22 @@ If you cannot highlight text in the original PDF, run OCR first.
 | APA (USA) | Variable | Some documents are more narrative and less recommendation-structured |
 | Local hospital protocols | Variable | Often excellent if they are plain text; weak if exported from slides |
 
+## Official Sources To Test With
+
+If you want to try Herald on real public material, start from official publisher pages instead of mirrored PDFs:
+
+- [NICE Guidance](https://www.nice.org.uk/guidance/)
+- [WHO Guidelines](https://www.who.int/publications/guidelines/en/)
+- [SIGN Guidelines](https://www.sign.ac.uk/guidelines/)
+- [CDC Clinical Guidance](https://www.cdc.gov/flu/hcp/clinical-guidance/index.html)
+
+Practical advice:
+
+- choose PDFs with selectable text
+- prefer guideline pages with conventional recommendation prose over slide decks and infographic-heavy assets
+- use the publisher landing page first, then pick a single guideline PDF from there
+- always check licence and reuse terms before sharing converted outputs
+
 ## Practical Advice
 
 Before parsing a real guideline:

@@ -237,6 +237,17 @@ Short version:
 - okay with caveats: two-column layouts, complex tables
 - weak: scanned PDFs without OCR, image-heavy flowcharts, slide decks
 
+## Try It With Real Guidelines
+
+If you want to test Herald on real public guidelines, start with structured, text-based documents from major publishers:
+
+- [NICE Guidance](https://www.nice.org.uk/guidance/)
+- [WHO Guidelines](https://www.who.int/publications/guidelines/en/)
+- [SIGN Guidelines](https://www.sign.ac.uk/guidelines/)
+- [CDC Clinical Guidance](https://www.cdc.gov/flu/hcp/clinical-guidance/index.html)
+
+Prefer guideline landing pages over random mirrored PDFs. Herald works best on documents with selectable text, numbered sections, and explicit recommendation statements.
+
 ## Licensing And Content
 
 Clinical practice guidelines are usually copyrighted by their publishers. Herald is designed to let users convert and query guidelines locally, but you still need to respect each publisher's reuse policy.
