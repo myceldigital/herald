@@ -27,7 +27,7 @@ def convert_pdf(input_path: Path) -> str:
     except ImportError:
         raise RuntimeError(
             "markitdown is required for PDF conversion. "
-            "Install it with: pip install 'guideline-as-code[all]' "
+            "Install it with: pip install 'herald-cpg[all]' "
             "or: pip install markitdown"
         )
 
@@ -49,10 +49,12 @@ def _normalize_markdown(text: str) -> str:
     """Clean up markitdown output for better parsing.
 
     Fixes common markitdown artifacts:
+    - Form feed/page break characters embedded in the text stream
     - Excessive blank lines
     - Inconsistent heading markers
     - Trailing whitespace
     """
+    text = text.replace("\f", "\n")
     lines = text.split("\n")
     cleaned = []
     prev_blank = False

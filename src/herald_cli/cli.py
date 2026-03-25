@@ -8,6 +8,12 @@ import click
 from rich.console import Console
 
 console = Console()
+_CLI_HANDLED_EXCEPTIONS = (RuntimeError, ValueError, OSError, json.JSONDecodeError)
+
+
+def _raise_click_error(exc: Exception) -> None:
+    """Render expected runtime failures as clean CLI errors."""
+    raise click.ClickException(str(exc)) from exc
 
 
 @click.group()
@@ -30,12 +36,15 @@ def cli():
 def convert(input_file: Path, output: Path | None):
     """Convert a guideline PDF to structured markdown."""
     from herald_cli.convert import convert_pdf
-    if output is None:
-        output = input_file.with_suffix(".md")
-    console.print(f"[bold]Converting[/bold] {input_file.name} → {output.name}")
-    result = convert_pdf(input_file)
-    output.write_text(result, encoding="utf-8")
-    console.print(f"[green]✓[/green] Written {output} ({result.count(chr(10))} lines)")
+    try:
+        if output is None:
+            output = input_file.with_suffix(".md")
+        console.print(f"[bold]Converting[/bold] {input_file.name} → {output.name}")
+        result = convert_pdf(input_file)
+        output.write_text(result, encoding="utf-8")
+        console.print(f"[green]✓[/green] Written {output} ({result.count(chr(10))} lines)")
+    except _CLI_HANDLED_EXCEPTIONS as exc:
+        _raise_click_error(exc)
 
 
 @cli.command()
@@ -46,14 +55,17 @@ def convert(input_file: Path, output: Path | None):
 def parse(input_file: Path, output: Path | None, provider: str, model: str | None):
     """Parse guideline markdown into a decision tree JSON."""
     from herald_cli.parse import parse_guideline
-    if output is None:
-        output = input_file.with_suffix(".json")
-    console.print(f"[bold]Parsing[/bold] {input_file.name} with {provider}")
-    md = input_file.read_text(encoding="utf-8")
-    tree = parse_guideline(md, provider=provider, model=model)
-    output.write_text(json.dumps(tree, indent=2, ensure_ascii=False), encoding="utf-8")
-    n = len(tree.get("decisions", []))
-    console.print(f"[green]✓[/green] Extracted {n} decision nodes → {output}")
+    try:
+        if output is None:
+            output = input_file.with_suffix(".json")
+        console.print(f"[bold]Parsing[/bold] {input_file.name} with {provider}")
+        md = input_file.read_text(encoding="utf-8")
+        tree = parse_guideline(md, provider=provider, model=model)
+        output.write_text(json.dumps(tree, indent=2, ensure_ascii=False), encoding="utf-8")
+        n = len(tree.get("decisions", []))
+        console.print(f"[green]✓[/green] Extracted {n} decision nodes → {output}")
+    except _CLI_HANDLED_EXCEPTIONS as exc:
+        _raise_click_error(exc)
 
 
 @cli.command()
@@ -90,7 +102,10 @@ def query(input_files, ask, fmt, log, batch, output):
         console.print("[red]Error: provide at least one guideline JSON.[/red]")
         raise SystemExit(1)
 
-    guidelines = [json.loads(f.read_text(encoding="utf-8")) for f in input_files]
+    try:
+        guidelines = [json.loads(f.read_text(encoding="utf-8")) for f in input_files]
+    except _CLI_HANDLED_EXCEPTIONS as exc:
+        _raise_click_error(exc)
 
     # --- Batch mode ---
     if batch:
@@ -433,9 +448,12 @@ def _show_fields(engine):
 def validate(tree_file: Path, source: Path):
     """Validate parsed tree against its source markdown."""
     from herald_cli.validate import print_validation_report, validate_tree
-    console.print(f"[bold]Validating[/bold] {tree_file.name} against {source.name}\n")
-    results = validate_tree(tree_file, source)
-    print_validation_report(results, console)
+    try:
+        console.print(f"[bold]Validating[/bold] {tree_file.name} against {source.name}\n")
+        results = validate_tree(tree_file, source)
+        print_validation_report(results, console)
+    except _CLI_HANDLED_EXCEPTIONS as exc:
+        _raise_click_error(exc)
 
 
 @cli.command()
@@ -446,61 +464,63 @@ def validate(tree_file: Path, source: Path):
 def diff(old_file: Path, new_file: Path, fmt: str, output: Path | None):
     """Compare two versions of a parsed guideline."""
     from herald_cli.diff import diff_guidelines, format_markdown
+    try:
+        old = json.loads(old_file.read_text(encoding="utf-8"))
+        new = json.loads(new_file.read_text(encoding="utf-8"))
+        result = diff_guidelines(old, new)
 
-    old = json.loads(old_file.read_text(encoding="utf-8"))
-    new = json.loads(new_file.read_text(encoding="utf-8"))
-    result = diff_guidelines(old, new)
+        if fmt == "json":
+            out_text = json.dumps(result, indent=2, ensure_ascii=False)
+            if output:
+                output.write_text(out_text, encoding="utf-8")
+            else:
+                click.echo(out_text)
+            return
 
-    if fmt == "json":
-        out_text = json.dumps(result, indent=2, ensure_ascii=False)
-        if output:
-            output.write_text(out_text, encoding="utf-8")
-        else:
-            click.echo(out_text)
-        return
+        if fmt == "markdown":
+            md = format_markdown(result, old_file.name, new_file.name)
+            if output:
+                output.write_text(md, encoding="utf-8")
+                console.print(f"[green]✓[/green] Written {output}")
+            else:
+                click.echo(md)
+            return
 
-    if fmt == "markdown":
-        md = format_markdown(result, old_file.name, new_file.name)
-        if output:
-            output.write_text(md, encoding="utf-8")
-            console.print(f"[green]✓[/green] Written {output}")
-        else:
-            click.echo(md)
-        return
-
-    # Text format
-    s = result["summary"]
-    console.print(
-        f"\n[bold]Guideline diff:[/bold] {old_file.name} → {new_file.name}\n"
-    )
-    console.print(
-        f"  [green]+{s['nodes_added']} added[/green]  "
-        f"[red]-{s['nodes_removed']} removed[/red]  "
-        f"[yellow]~{s['nodes_modified']} modified[/yellow]  "
-        f"[dim]={s['nodes_unchanged']} unchanged[/dim]"
-    )
-    if result["metadata_changes"]:
-        console.print("\n[bold]Metadata changes:[/bold]")
-        for c in result["metadata_changes"]:
-            console.print(f"  {c['field']}: {c['old']} → {c['new']}")
-    if result["added"]:
-        console.print("\n[bold green]Added:[/bold green]")
-        for a in result["added"]:
-            console.print(f"  + {a['id']}: {a['description']}")
-    if result["removed"]:
-        console.print("\n[bold red]Removed:[/bold red]")
-        for r in result["removed"]:
-            console.print(f"  - {r['id']}: {r['description']}")
-    if result["modified"]:
-        console.print("\n[bold yellow]Modified:[/bold yellow]")
-        for m in result["modified"]:
-            console.print(f"  ~ {m['id']}:")
-            for c in m["changes"]:
-                if "old" in c and "new" in c:
-                    console.print(f"    {c['field']}:")
-                    console.print(f"      [red]- {str(c['old'])[:80]}[/red]")
-                    console.print(f"      [green]+ {str(c['new'])[:80]}[/green]")
-    console.print()
+        # Text format
+        s = result["summary"]
+        console.print(
+            f"\n[bold]Guideline diff:[/bold] {old_file.name} → {new_file.name}\n"
+        )
+        console.print(
+            f"  [green]+{s['nodes_added']} added[/green]  "
+            f"[red]-{s['nodes_removed']} removed[/red]  "
+            f"[yellow]~{s['nodes_modified']} modified[/yellow]  "
+            f"[dim]={s['nodes_unchanged']} unchanged[/dim]"
+        )
+        if result["metadata_changes"]:
+            console.print("\n[bold]Metadata changes:[/bold]")
+            for c in result["metadata_changes"]:
+                console.print(f"  {c['field']}: {c['old']} → {c['new']}")
+        if result["added"]:
+            console.print("\n[bold green]Added:[/bold green]")
+            for a in result["added"]:
+                console.print(f"  + {a['id']}: {a['description']}")
+        if result["removed"]:
+            console.print("\n[bold red]Removed:[/bold red]")
+            for r in result["removed"]:
+                console.print(f"  - {r['id']}: {r['description']}")
+        if result["modified"]:
+            console.print("\n[bold yellow]Modified:[/bold yellow]")
+            for m in result["modified"]:
+                console.print(f"  ~ {m['id']}:")
+                for c in m["changes"]:
+                    if "old" in c and "new" in c:
+                        console.print(f"    {c['field']}:")
+                        console.print(f"      [red]- {str(c['old'])[:80]}[/red]")
+                        console.print(f"      [green]+ {str(c['new'])[:80]}[/green]")
+        console.print()
+    except _CLI_HANDLED_EXCEPTIONS as exc:
+        _raise_click_error(exc)
 
 
 @cli.command(name="export")
@@ -510,12 +530,17 @@ def diff(old_file: Path, new_file: Path, fmt: str, output: Path | None):
 def export_cmd(input_file: Path, output: Path | None, fmt: str):
     """Export a parsed guideline to FHIR PlanDefinition."""
     from herald_cli.export import export_fhir
-    data = json.loads(input_file.read_text(encoding="utf-8"))
-    result = export_fhir(data)
-    if output is None:
-        output = input_file.with_suffix(f".{fmt}.json")
-    output.write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
-    console.print(f"[green]✓[/green] Exported {len(result.get('action', []))} actions → {output}")
+    try:
+        data = json.loads(input_file.read_text(encoding="utf-8"))
+        result = export_fhir(data)
+        if output is None:
+            output = input_file.with_suffix(f".{fmt}.json")
+        output.write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
+        console.print(
+            f"[green]✓[/green] Exported {len(result.get('action', []))} actions → {output}"
+        )
+    except _CLI_HANDLED_EXCEPTIONS as exc:
+        _raise_click_error(exc)
 
 
 if __name__ == "__main__":

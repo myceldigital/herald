@@ -126,6 +126,22 @@ _PRIORITY_ORDER = {
     "low": 3, "routine": 3, "elective": 3,
 }
 
+_ENUM_VALUE_ALIASES = {
+    "adult": ("adults",),
+    "adults": ("adult",),
+    "child": ("children",),
+    "children": ("child",),
+    "adolescent": ("adolescents",),
+    "adolescents": ("adolescent",),
+    "older adult": ("older adults", "elderly"),
+    "older adults": ("older adult", "elderly"),
+    "elderly": ("older adult", "older adults"),
+}
+
+_COMPOSITE_ENUM_MEMBERS = {
+    "children_and_adolescents": ("children", "adolescents", "child", "adolescent"),
+}
+
 
 class QueryEngine:
     """Traverse a parsed guideline decision tree given a patient profile."""
@@ -354,9 +370,9 @@ def _condition_matches(condition, patient, cond_sets=None):
     if actual is None:
         return False
     if operator == "eq":
-        return _normalize(actual) == _normalize(expected)
+        return _enum_values_match(actual, expected)
     if operator == "neq":
-        return _normalize(actual) != _normalize(expected)
+        return not _enum_values_match(actual, expected)
     if operator in ("in", "not_in"):
         if isinstance(expected, list):
             if cond_sets:
@@ -391,6 +407,11 @@ def _condition_matches(condition, patient, cond_sets=None):
         return {"gt": an > en, "gte": an >= en,
                 "lt": an < en, "lte": an <= en}[operator]
     if operator == "any_match":
+        if isinstance(expected, list):
+            if isinstance(actual, list):
+                actual_values = {_normalize(v) for v in actual}
+                return any(_normalize(v) in actual_values for v in expected)
+            return _normalize(actual) in {_normalize(v) for v in expected}
         if not isinstance(actual, list):
             return False
         sub = (expected.get("conditions", [])
@@ -528,9 +549,13 @@ def parse_patient_description(text, guideline=None):
         for fd in pf:
             fn = fd.get("field", "")
             ft = fd.get("type", "string")
+            kv = (fd.get("values") or []) + (fd.get("known_values") or [])
             if fn in patient:
+                if ft == "enum" and kv:
+                    aligned = _align_existing_enum_value(patient[fn], kv)
+                    if aligned is not None:
+                        patient[fn] = aligned
                 continue
-            kv = fd.get("values", []) + fd.get("known_values", [])
 
             if ft == "bool":
                 _extract_bool_field(text_lower, fn, fs, patient, negated, meta)
@@ -559,7 +584,7 @@ def parse_patient_description(text, guideline=None):
             fn = fd.get("field", "")
             if fn in patient or not fd.get("required", False):
                 continue
-            kv = fd.get("values", []) + fd.get("known_values", [])
+            kv = (fd.get("values") or []) + (fd.get("known_values") or [])
             if len(kv) == 1:
                 patient[fn] = kv[0]
                 meta[fn] = {"source": "auto_inferred"}
@@ -585,11 +610,12 @@ def parse_patient_description(text, guideline=None):
 
 def _extract_enum_field(tl, tr, fn, kv, fs, p, neg, m):
     for v in sorted(kv, key=len, reverse=True):
-        if _is_negated(v, tl, neg):
+        display = v.replace("_", " ")
+        if _is_negated(v, tl, neg) or _is_negated(display, tl, neg):
             continue
-        if _term_in_text(v, tl, tr):
+        if _term_in_text(v, tl, tr) or _term_in_text(display, tl, tr):
             p[fn] = v
-            m[fn] = {"source": "extracted", "matched": v}
+            m[fn] = {"source": "extracted", "matched": display if display in tr.lower() else v}
             return
         for syn in fs.get(v, []):
             if _is_negated(syn, tl, neg):
@@ -677,6 +703,44 @@ def _term_in_text(term, tl, tr):
 def _is_negated(term, tl, negated):
     t = term.lower()
     return any(t in n or n in t for n in negated)
+
+
+def _align_existing_enum_value(value, allowed_values):
+    """Map an already-extracted enum value onto the guideline's canonical vocabulary."""
+    normalized_value = _normalize(str(value).replace("_", " "))
+
+    for candidate in allowed_values:
+        normalized_candidate = _normalize(str(candidate).replace("_", " "))
+        candidate_aliases = {
+            _normalize(candidate),
+            normalized_candidate,
+        }
+        candidate_aliases.update(_ENUM_VALUE_ALIASES.get(normalized_candidate, ()))
+        candidate_aliases.update(_ENUM_VALUE_ALIASES.get(normalized_value, ()))
+        if normalized_value in candidate_aliases:
+            return candidate
+
+    return None
+
+
+def _enum_values_match(actual, expected):
+    """Compare scalar enum values with light alias support."""
+    actual_norm = _normalize(actual)
+    expected_norm = _normalize(expected)
+
+    if actual_norm == expected_norm:
+        return True
+
+    if actual_norm in _ENUM_VALUE_ALIASES.get(expected_norm, ()):
+        return True
+    if expected_norm in _ENUM_VALUE_ALIASES.get(actual_norm, ()):
+        return True
+
+    composite_members = _COMPOSITE_ENUM_MEMBERS.get(expected_norm, ())
+    if actual_norm in composite_members:
+        return True
+
+    return False
 
 
 # ---------------------------------------------------------------------------

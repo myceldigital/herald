@@ -21,6 +21,68 @@ def adhd_engine():
 class TestQueryEngine:
     """Tests for deterministic decision tree traversal."""
 
+    def test_any_match_supports_scalar_membership(self):
+        engine = QueryEngine(
+            {
+                "guideline": {"title": "Test"},
+                "decisions": [
+                    {
+                        "id": "root",
+                        "entry_point": True,
+                        "conditions": [
+                            {
+                                "field": "age_group",
+                                "operator": "any_match",
+                                "value": ["child", "adolescent"],
+                            }
+                        ],
+                        "recommendation": {
+                            "action": "Offer child pathway",
+                            "source_section": "1",
+                            "source_text": "Offer child pathway.",
+                        },
+                        "branches": [],
+                    }
+                ],
+            }
+        )
+
+        results = engine.query({"age_group": "child"})
+
+        assert len(results) == 1
+        assert results[0]["recommendation"]["action"] == "Offer child pathway"
+
+    def test_eq_supports_composite_enum_values(self):
+        engine = QueryEngine(
+            {
+                "guideline": {"title": "Test"},
+                "decisions": [
+                    {
+                        "id": "root",
+                        "entry_point": True,
+                        "conditions": [
+                            {
+                                "field": "age_group",
+                                "operator": "eq",
+                                "value": "children_and_adolescents",
+                            }
+                        ],
+                        "recommendation": {
+                            "action": "Offer ADHD pathway",
+                            "source_section": "1",
+                            "source_text": "Offer ADHD pathway.",
+                        },
+                        "branches": [],
+                    }
+                ],
+            }
+        )
+
+        results = engine.query({"age_group": "children"})
+
+        assert len(results) == 1
+        assert results[0]["recommendation"]["action"] == "Offer ADHD pathway"
+
     def test_basic_adhd_adult_returns_first_line(self, adhd_engine):
         patient = {"diagnosis": "ADHD", "age_group": "adult"}
         results = adhd_engine.query(patient)
@@ -173,3 +235,66 @@ class TestPatientDescriptionParser:
     def test_child_age_group(self):
         patient = parse_patient_description("8M ADHD")
         assert patient.get("age_group") == "child"
+
+    def test_guideline_parser_handles_null_known_values(self):
+        guideline = {
+            "patient_fields": [
+                {
+                    "field": "diagnosis",
+                    "type": "enum",
+                    "required": True,
+                    "values": ["adhd"],
+                    "known_values": ["adhd"],
+                },
+                {
+                    "field": "childbearing_potential",
+                    "type": "bool",
+                    "required": False,
+                    "values": None,
+                    "known_values": None,
+                },
+            ],
+            "field_synonyms": {
+                "adhd": ["attention deficit hyperactivity disorder"],
+                "childbearing_potential": ["of childbearing potential"],
+            },
+        }
+
+        patient = parse_patient_description(
+            "8M attention deficit hyperactivity disorder",
+            guideline=guideline,
+        )
+
+        assert patient.get("diagnosis") == "adhd"
+        assert patient.get("age_group") == "child"
+
+    def test_guideline_parser_aligns_enum_values_to_guideline_vocab(self):
+        guideline = {
+            "patient_fields": [
+                {
+                    "field": "diagnosis",
+                    "type": "enum",
+                    "required": True,
+                    "values": ["generalized_anxiety_disorder", "panic_disorder"],
+                    "known_values": ["generalized_anxiety_disorder", "panic_disorder"],
+                },
+                {
+                    "field": "age_group",
+                    "type": "enum",
+                    "required": True,
+                    "values": ["children", "adolescents", "adults"],
+                    "known_values": ["children", "adolescents", "adults"],
+                },
+            ],
+            "field_synonyms": {
+                "panic_disorder": ["panic attacks"],
+            },
+        }
+
+        patient = parse_patient_description(
+            "35F generalized anxiety disorder with panic attacks",
+            guideline=guideline,
+        )
+
+        assert patient.get("diagnosis") == "generalized_anxiety_disorder"
+        assert patient.get("age_group") == "adults"
