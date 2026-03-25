@@ -1,0 +1,20 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+.pytest_cache/
+.ruff_cache/
+*.so
+.env
+.venv/
+venv/
+ENV/
+
+# User's own guideline files (don't commit copyrighted content)
+who-*.pdf
+who-*.md
+who-*.json
