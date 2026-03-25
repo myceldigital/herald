@@ -1,0 +1,49 @@
+name: Guideline compatibility report
+description: Report a real public guideline that converts or parses poorly
+title: "[Guideline]: "
+labels: ["help wanted", "documentation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this when Herald struggles with a real public guideline and you want to point maintainers at a concrete parsing target.
+
+  - type: input
+    id: source_url
+    attributes:
+      label: Official public source URL
+      placeholder: e.g. https://www.nice.org.uk/guidance/...
+    validations:
+      required: true
+
+  - type: input
+    id: publisher
+    attributes:
+      label: Publisher
+      placeholder: e.g. NICE, WHO, SIGN, CDC
+    validations:
+      required: true
+
+  - type: textarea
+    id: observed_problem
+    attributes:
+      label: What went wrong
+      description: Describe the conversion or parse failure as concretely as possible.
+    validations:
+      required: true
+
+  - type: textarea
+    id: problematic_structure
+    attributes:
+      label: Problematic structure
+      description: For example two-column layout, tables, scanned pages, repeated headers, algorithm images, unusual section numbering.
+    validations:
+      required: false
+
+  - type: textarea
+    id: command_or_notes
+    attributes:
+      label: Commands run or notes
+      render: shell
+    validations:
+      required: false
